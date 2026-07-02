@@ -1,16 +1,14 @@
 import "dotenv/config";
 import express from "express";
 import path from "path";
-import sqlite3 from "sqlite3";
 import mysql from "mysql2/promise";
 import { createServer as createViteServer } from "vite";
+import crypto from "crypto";
 
 const app = express();
 const PORT = 3000;
 
 app.use(express.json());
-
-import crypto from "crypto";
 
 // Load MySQL Database configurations with default values
 const MYSQL_HOST = process.env.DB_HOST || "localhost";
@@ -19,9 +17,7 @@ const MYSQL_USER = process.env.DB_USER || "root";
 const MYSQL_PASSWORD = process.env.DB_PASSWORD || "";
 const MYSQL_DATABASE = process.env.DB_NAME || "rhinocargo_db";
 
-let dbType: "sqlite" | "mysql" = "sqlite";
 let mysqlPool: mysql.Pool | null = null;
-let db: sqlite3.Database | null = null;
 
 async function connectDatabase() {
   try {
@@ -53,21 +49,15 @@ async function connectDatabase() {
       keepAliveInitialDelay: 0
     });
 
-    dbType = "mysql";
     console.log(`[Database] Successfully connected and configured with MySQL database: "${MYSQL_DATABASE}".`);
   } catch (err: any) {
-    console.warn(`[Database] MySQL connection could not be established: ${err.message}`);
-    console.warn("[Database] FALLING BACK TO LOCAL SQLite. Live preview is 100% operational with SQLite!");
-    console.warn("[Database] On export, make sure to set MySQL environment credentials in '.env'.");
-
-    dbType = "sqlite";
-    db = new sqlite3.Database("database.db", (dbErr) => {
-      if (dbErr) {
-        console.error("[Database] Error opening fallback SQLite database:", dbErr);
-      } else {
-        console.log("[Database] Connected to SQLite fallback database successfully.");
-      }
-    });
+    console.error(`[Database] MySQL connection failed: ${err.message}`);
+    console.error("[Database] Please check your environment variables:");
+    console.error(`  DB_HOST: ${MYSQL_HOST}`);
+    console.error(`  DB_PORT: ${MYSQL_PORT}`);
+    console.error(`  DB_USER: ${MYSQL_USER}`);
+    console.error(`  DB_NAME: ${MYSQL_DATABASE}`);
+    process.exit(1);
   }
 }
 
@@ -100,522 +90,259 @@ async function logActivity(usuario_id: number | null, usuario_nome: string, acao
   }
 }
 
-// Promisified Query Helpers supporting BOTH MySQL and SQLite
+// Promisified Query Helpers for MySQL
 function query<T>(sql: string, params: any[] = []): Promise<T[]> {
-  if (dbType === "mysql" && mysqlPool) {
-    return mysqlPool.execute(sql, params).then(([rows]) => rows as T[]);
-  } else {
-    return new Promise((resolve, reject) => {
-      if (!db) return reject(new Error("Database not connected"));
-      db.all(sql, params, (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows as T[]);
-      });
-    });
-  }
+  if (!mysqlPool) throw new Error("Database not connected");
+  return mysqlPool.execute(sql, params).then(([rows]) => rows as T[]);
 }
 
 function run(sql: string, params: any[] = []): Promise<{ lastID: number; changes: number }> {
-  if (dbType === "mysql" && mysqlPool) {
-    return mysqlPool.execute(sql, params).then(([result]) => {
-      return {
-        lastID: (result as any).insertId || 0,
-        changes: (result as any).affectedRows || 0
-      };
-    });
-  } else {
-    return new Promise((resolve, reject) => {
-      if (!db) return reject(new Error("Database not connected"));
-      db.run(sql, params, function (err) {
-        if (err) reject(err);
-        else resolve({ lastID: this.lastID, changes: this.changes });
-      });
-    });
-  }
+  if (!mysqlPool) throw new Error("Database not connected");
+  return mysqlPool.execute(sql, params).then(([result]) => {
+    return {
+      lastID: (result as any).insertId || 0,
+      changes: (result as any).affectedRows || 0
+    };
+  });
 }
 
 function get<T>(sql: string, params: any[] = []): Promise<T | undefined> {
-  if (dbType === "mysql" && mysqlPool) {
-    return mysqlPool.execute(sql, params).then(([rows]) => {
-      const results = rows as any[];
-      return results.length > 0 ? results[0] as T : undefined;
-    });
-  } else {
-    return new Promise((resolve, reject) => {
-      if (!db) return reject(new Error("Database not connected"));
-      db.get(sql, params, (err, row) => {
-        if (err) reject(err);
-        else resolve(row as T | undefined);
-      });
-    });
-  }
+  if (!mysqlPool) throw new Error("Database not connected");
+  return mysqlPool.execute(sql, params).then(([rows]) => {
+    const results = rows as any[];
+    return results.length > 0 ? results[0] as T : undefined;
+  });
 }
 
 // Database Initialization and Seeding
 async function initializeDatabase() {
   try {
-    if (dbType === "mysql") {
-      console.log("[Database] Constructing MySQL Schema...");
+    console.log("[Database] Constructing MySQL Schema...");
 
-      // 1. precos_provincias
-      await run(`
-        CREATE TABLE IF NOT EXISTS precos_provincias (
-          provincia VARCHAR(100) PRIMARY KEY,
-          diesel DOUBLE NOT NULL,
-          gasolina DOUBLE NOT NULL,
-          gas DOUBLE NOT NULL
-        )
-      `);
+    // 1. precos_provincias
+    await run(`
+      CREATE TABLE IF NOT EXISTS precos_provincias (
+        provincia VARCHAR(100) PRIMARY KEY,
+        diesel DOUBLE NOT NULL,
+        gasolina DOUBLE NOT NULL,
+        gas DOUBLE NOT NULL
+      )
+    `);
 
-      // 2. usuarios
-      await run(`
-        CREATE TABLE IF NOT EXISTS usuarios (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          email VARCHAR(255) UNIQUE NOT NULL,
-          senha VARCHAR(255) NOT NULL,
-          nome VARCHAR(255) NOT NULL,
-          role VARCHAR(50) NOT NULL
-        )
-      `);
+    // 2. usuarios
+    await run(`
+      CREATE TABLE IF NOT EXISTS usuarios (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        senha VARCHAR(255) NOT NULL,
+        nome VARCHAR(255) NOT NULL,
+        role VARCHAR(50) NOT NULL
+      )
+    `);
 
-      // 3. funcionarios
-      await run(`
-        CREATE TABLE IF NOT EXISTS funcionarios (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          nome VARCHAR(255) NOT NULL,
-          email VARCHAR(255) NOT NULL,
-          telefone VARCHAR(50) NOT NULL,
-          carta_conducao VARCHAR(100),
-          validade_carta VARCHAR(50),
-          ativo INT NOT NULL DEFAULT 1,
-          categoria_carta VARCHAR(50),
-          bi VARCHAR(50) NOT NULL,
-          nuit VARCHAR(50) NOT NULL,
-          observacoes TEXT,
-          score INT NOT NULL DEFAULT 100,
-          cargo VARCHAR(100) NOT NULL DEFAULT 'Motorista',
-          salario_base DOUBLE NOT NULL DEFAULT 15000,
-          data_admissao VARCHAR(50),
-          usuario_id INT,
-          empresa_nome VARCHAR(255) DEFAULT 'RHINO CARGO, LIMITADA',
-          empresa_nuit VARCHAR(50) DEFAULT '400582914',
-          empresa_localizacao VARCHAR(500) DEFAULT 'Porto de Maputo, Recinto Portuário, Maputo, Moçambique'
-        )
-      `);
+    // 3. funcionarios
+    await run(`
+      CREATE TABLE IF NOT EXISTS funcionarios (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nome VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        telefone VARCHAR(50) NOT NULL,
+        carta_conducao VARCHAR(100),
+        validade_carta VARCHAR(50),
+        ativo INT NOT NULL DEFAULT 1,
+        categoria_carta VARCHAR(50),
+        bi VARCHAR(50) NOT NULL,
+        nuit VARCHAR(50) NOT NULL,
+        observacoes TEXT,
+        score INT NOT NULL DEFAULT 100,
+        cargo VARCHAR(100) NOT NULL DEFAULT 'Motorista',
+        salario_base DOUBLE NOT NULL DEFAULT 15000,
+        data_admissao VARCHAR(50),
+        usuario_id INT,
+        empresa_nome VARCHAR(255) DEFAULT 'RHINO CARGO, LIMITADA',
+        empresa_nuit VARCHAR(50) DEFAULT '400582914',
+        empresa_localizacao VARCHAR(500) DEFAULT 'Porto de Maputo, Recinto Portuário, Maputo, Moçambique'
+      )
+    `);
 
-      // 3.1. view motoristas
-      await run("DROP VIEW IF EXISTS motoristas");
-      await run(`
-        CREATE VIEW motoristas AS 
-        SELECT id, nome, email, telefone, carta_conducao, validade_carta, ativo, categoria_carta, bi, nuit, observacoes, score 
-        FROM funcionarios 
-        WHERE cargo = 'Motorista' OR cargo = 'motorista'
-      `);
+    // 3.1. view motoristas
+    await run("DROP VIEW IF EXISTS motoristas");
+    await run(`
+      CREATE VIEW motoristas AS 
+      SELECT id, nome, email, telefone, carta_conducao, validade_carta, ativo, categoria_carta, bi, nuit, observacoes, score 
+      FROM funcionarios 
+      WHERE cargo = 'Motorista' OR cargo = 'motorista'
+    `);
 
-      // 4. bombas
-      await run(`
-        CREATE TABLE IF NOT EXISTS bombas (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          nome VARCHAR(255) NOT NULL,
-          endereco VARCHAR(500) NOT NULL,
-          contacto VARCHAR(100) NOT NULL,
-          provincia VARCHAR(100) NOT NULL,
-          ativo INT NOT NULL DEFAULT 1,
-          preco_diesel DOUBLE,
-          preco_gasolina DOUBLE,
-          preco_gas DOUBLE
-        )
-      `);
+    // 4. bombas
+    await run(`
+      CREATE TABLE IF NOT EXISTS bombas (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nome VARCHAR(255) NOT NULL,
+        endereco VARCHAR(500) NOT NULL,
+        contacto VARCHAR(100) NOT NULL,
+        provincia VARCHAR(100) NOT NULL,
+        ativo INT NOT NULL DEFAULT 1,
+        preco_diesel DOUBLE,
+        preco_gasolina DOUBLE,
+        preco_gas DOUBLE
+      )
+    `);
 
-      // 5. viaturas
-      await run(`
-        CREATE TABLE IF NOT EXISTS viaturas (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          matricula VARCHAR(50) UNIQUE NOT NULL,
-          marca VARCHAR(100) NOT NULL,
-          modelo VARCHAR(100) NOT NULL,
-          tipo VARCHAR(100) NOT NULL,
-          ano INT NOT NULL,
-          kilometragem DOUBLE NOT NULL,
-          km_atual DOUBLE NOT NULL,
-          capacidade DOUBLE NOT NULL,
-          combustivel VARCHAR(50) NOT NULL,
-          estado VARCHAR(50) NOT NULL,
-          observacoes TEXT
-        )
-      `);
+    // 5. viaturas
+    await run(`
+      CREATE TABLE IF NOT EXISTS viaturas (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        matricula VARCHAR(50) UNIQUE NOT NULL,
+        marca VARCHAR(100) NOT NULL,
+        modelo VARCHAR(100) NOT NULL,
+        tipo VARCHAR(100) NOT NULL,
+        ano INT NOT NULL,
+        kilometragem DOUBLE NOT NULL,
+        km_atual DOUBLE NOT NULL,
+        capacidade DOUBLE NOT NULL,
+        combustivel VARCHAR(50) NOT NULL,
+        estado VARCHAR(50) NOT NULL,
+        observacoes TEXT
+      )
+    `);
 
-      // 6. viagens
-      await run(`
-        CREATE TABLE IF NOT EXISTS viagens (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          numero_viagem VARCHAR(100) UNIQUE NOT NULL,
-          data_partida VARCHAR(50) NOT NULL,
-          data_chegada VARCHAR(50),
-          viatura_id INT NOT NULL,
-          motorista_id INT NOT NULL,
-          bomba_id INT,
-          litros_bomba DOUBLE NOT NULL,
-          litros_sistema DOUBLE NOT NULL,
-          diferenca_litros DOUBLE NOT NULL,
-          total_combustivel_mzn DOUBLE NOT NULL,
-          cliente VARCHAR(255) NOT NULL,
-          produto VARCHAR(255) NOT NULL,
-          origem VARCHAR(255) NOT NULL,
-          destino VARCHAR(255) NOT NULL,
-          p_o VARCHAR(255),
-          origem_combustivel VARCHAR(255),
-          combustivel_gasto_mzn DOUBLE NOT NULL,
-          expediente VARCHAR(255),
-          reforcos TEXT,
-          intermediacao_mzn DOUBLE NOT NULL,
-          escolta_mzn DOUBLE NOT NULL,
-          quebras_faltas_mzn DOUBLE NOT NULL,
-          faturacao_mzn DOUBLE NOT NULL,
-          total_remanescente_mzn DOUBLE NOT NULL,
-          estado VARCHAR(50) NOT NULL,
-          observacoes TEXT
-        )
-      `);
+    // 6. viagens
+    await run(`
+      CREATE TABLE IF NOT EXISTS viagens (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        numero_viagem VARCHAR(100) UNIQUE NOT NULL,
+        data_partida VARCHAR(50) NOT NULL,
+        data_chegada VARCHAR(50),
+        viatura_id INT NOT NULL,
+        motorista_id INT NOT NULL,
+        bomba_id INT,
+        litros_bomba DOUBLE NOT NULL,
+        litros_sistema DOUBLE NOT NULL,
+        diferenca_litros DOUBLE NOT NULL,
+        total_combustivel_mzn DOUBLE NOT NULL,
+        cliente VARCHAR(255) NOT NULL,
+        produto VARCHAR(255) NOT NULL,
+        origem VARCHAR(255) NOT NULL,
+        destino VARCHAR(255) NOT NULL,
+        p_o VARCHAR(255),
+        origem_combustivel VARCHAR(255),
+        combustivel_gasto_mzn DOUBLE NOT NULL,
+        expediente VARCHAR(255),
+        reforcos TEXT,
+        intermediacao_mzn DOUBLE NOT NULL,
+        escolta_mzn DOUBLE NOT NULL,
+        quebras_faltas_mzn DOUBLE NOT NULL,
+        faturacao_mzn DOUBLE NOT NULL,
+        total_remanescente_mzn DOUBLE NOT NULL,
+        estado VARCHAR(50) NOT NULL,
+        observacoes TEXT
+      )
+    `);
 
-      // 7. abastecimentos
-      await run(`
-        CREATE TABLE IF NOT EXISTS abastecimentos (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          viatura_id INT NOT NULL,
-          viagem VARCHAR(100),
-          cliente VARCHAR(255),
-          data_abastecimento VARCHAR(50) NOT NULL,
-          bomba_name VARCHAR(255) NOT NULL,
-          provincia VARCHAR(100) NOT NULL,
-          bomba_litros DOUBLE NOT NULL,
-          sistema_litros DOUBLE NOT NULL,
-          diferenca DOUBLE NOT NULL,
-          valor_combustivel DOUBLE NOT NULL,
-          valor_unitario DOUBLE NOT NULL,
-          observacoes TEXT
-        )
-      `);
+    // 7. abastecimentos
+    await run(`
+      CREATE TABLE IF NOT EXISTS abastecimentos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        viatura_id INT NOT NULL,
+        viagem VARCHAR(100),
+        cliente VARCHAR(255),
+        data_abastecimento VARCHAR(50) NOT NULL,
+        bomba_name VARCHAR(255) NOT NULL,
+        provincia VARCHAR(100) NOT NULL,
+        bomba_litros DOUBLE NOT NULL,
+        sistema_litros DOUBLE NOT NULL,
+        diferenca DOUBLE NOT NULL,
+        valor_combustivel DOUBLE NOT NULL,
+        valor_unitario DOUBLE NOT NULL,
+        observacoes TEXT
+      )
+    `);
 
-      // 8. alertas
-      await run(`
-        CREATE TABLE IF NOT EXISTS alertas (
-          id VARCHAR(100) PRIMARY KEY,
-          data_hora VARCHAR(50) NOT NULL,
-          tipo VARCHAR(100) NOT NULL,
-          titulo VARCHAR(255) NOT NULL,
-          mensagem TEXT NOT NULL,
-          resolvido INT NOT NULL DEFAULT 0,
-          gravidade VARCHAR(50) NOT NULL,
-          meta TEXT
-        )
-      `);
+    // 8. alertas
+    await run(`
+      CREATE TABLE IF NOT EXISTS alertas (
+        id VARCHAR(100) PRIMARY KEY,
+        data_hora VARCHAR(50) NOT NULL,
+        tipo VARCHAR(100) NOT NULL,
+        titulo VARCHAR(255) NOT NULL,
+        mensagem TEXT NOT NULL,
+        resolvido INT NOT NULL DEFAULT 0,
+        gravidade VARCHAR(50) NOT NULL,
+        meta TEXT
+      )
+    `);
 
-      // 9. despesas_gerais
-      await run(`
-        CREATE TABLE IF NOT EXISTS despesas_gerais (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          descricao VARCHAR(255) NOT NULL,
-          categoria VARCHAR(100) NOT NULL,
-          valor DOUBLE NOT NULL,
-          data_despesa VARCHAR(50) NOT NULL,
-          funcionario_id INT,
-          viatura_id INT,
-          estado VARCHAR(50) NOT NULL DEFAULT 'Pago',
-          observacoes TEXT
-        )
-      `);
+    // 9. despesas_gerais
+    await run(`
+      CREATE TABLE IF NOT EXISTS despesas_gerais (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        descricao VARCHAR(255) NOT NULL,
+        categoria VARCHAR(100) NOT NULL,
+        valor DOUBLE NOT NULL,
+        data_despesa VARCHAR(50) NOT NULL,
+        funcionario_id INT,
+        viatura_id INT,
+        estado VARCHAR(50) NOT NULL DEFAULT 'Pago',
+        observacoes TEXT
+      )
+    `);
 
-      // 10. pedidos_rh
-      await run(`
-        CREATE TABLE IF NOT EXISTS pedidos_rh (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          funcionario_id INT NOT NULL,
-          tipo VARCHAR(100) NOT NULL,
-          data_inicio VARCHAR(50) NOT NULL,
-          data_fim VARCHAR(50) NOT NULL,
-          dias INT NOT NULL,
-          motivo TEXT,
-          estado VARCHAR(50) NOT NULL DEFAULT 'Pendente',
-          data_pedido VARCHAR(50) NOT NULL,
-          observacoes TEXT
-        )
-      `);
+    // 10. pedidos_rh
+    await run(`
+      CREATE TABLE IF NOT EXISTS pedidos_rh (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        funcionario_id INT NOT NULL,
+        tipo VARCHAR(100) NOT NULL,
+        data_inicio VARCHAR(50) NOT NULL,
+        data_fim VARCHAR(50) NOT NULL,
+        dias INT NOT NULL,
+        motivo TEXT,
+        estado VARCHAR(50) NOT NULL DEFAULT 'Pendente',
+        data_pedido VARCHAR(50) NOT NULL,
+        observacoes TEXT
+      )
+    `);
 
-      // 11. recibos_salarios
-      await run(`
-        CREATE TABLE IF NOT EXISTS recibos_salarios (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          funcionario_id INT NOT NULL,
-          mes_ano VARCHAR(50) NOT NULL,
-          salario_base DOUBLE NOT NULL,
-          bonus DOUBLE NOT NULL DEFAULT 0,
-          descontos DOUBLE NOT NULL DEFAULT 0,
-          salario_liquido DOUBLE NOT NULL,
-          data_emissao VARCHAR(50) NOT NULL,
-          estado VARCHAR(50) NOT NULL DEFAULT 'Pago',
-          observacoes TEXT,
-          faltas DOUBLE NOT NULL DEFAULT 0,
-          subsidios DOUBLE NOT NULL DEFAULT 0,
-          horas_extras DOUBLE NOT NULL DEFAULT 0,
-          inss DOUBLE NOT NULL DEFAULT 0,
-          irps DOUBLE NOT NULL DEFAULT 0
-        )
-      `);
+    // 11. recibos_salarios
+    await run(`
+      CREATE TABLE IF NOT EXISTS recibos_salarios (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        funcionario_id INT NOT NULL,
+        mes_ano VARCHAR(50) NOT NULL,
+        salario_base DOUBLE NOT NULL,
+        bonus DOUBLE NOT NULL DEFAULT 0,
+        descontos DOUBLE NOT NULL DEFAULT 0,
+        salario_liquido DOUBLE NOT NULL,
+        data_emissao VARCHAR(50) NOT NULL,
+        estado VARCHAR(50) NOT NULL DEFAULT 'Pago',
+        observacoes TEXT,
+        faltas DOUBLE NOT NULL DEFAULT 0,
+        subsidios DOUBLE NOT NULL DEFAULT 0,
+        horas_extras DOUBLE NOT NULL DEFAULT 0,
+        inss DOUBLE NOT NULL DEFAULT 0,
+        irps DOUBLE NOT NULL DEFAULT 0
+      )
+    `);
 
-      // 12. auditoria_logs
-      await run(`
-        CREATE TABLE IF NOT EXISTS auditoria_logs (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          usuario_id INT,
-          usuario_nome VARCHAR(255) NOT NULL,
-          acao VARCHAR(255) NOT NULL,
-          detalhes TEXT NOT NULL,
-          data_hora VARCHAR(50) NOT NULL,
-          ip_address VARCHAR(100)
-        )
-      `);
-
-    } else {
-      console.log("[Database] Constructing SQLite Schema...");
-
-      // 1. precos_provincias
-      await run(`
-        CREATE TABLE IF NOT EXISTS precos_provincias (
-          provincia TEXT PRIMARY KEY,
-          diesel REAL NOT NULL,
-          gasolina REAL NOT NULL,
-          gas REAL NOT NULL
-        )
-      `);
-
-      // 2. usuarios
-      await run(`
-        CREATE TABLE IF NOT EXISTS usuarios (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          email TEXT UNIQUE NOT NULL,
-          senha TEXT NOT NULL,
-          nome TEXT NOT NULL,
-          role TEXT NOT NULL
-        )
-      `);
-
-      // 3. funcionarios
-      await run(`
-        CREATE TABLE IF NOT EXISTS funcionarios (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          nome TEXT NOT NULL,
-          email TEXT NOT NULL,
-          telefone TEXT NOT NULL,
-          carta_conducao TEXT,
-          validade_carta TEXT,
-          ativo INTEGER NOT NULL DEFAULT 1,
-          categoria_carta TEXT,
-          bi TEXT NOT NULL,
-          nuit TEXT NOT NULL,
-          observacoes TEXT,
-          score INTEGER NOT NULL DEFAULT 100,
-          cargo TEXT NOT NULL DEFAULT 'Motorista',
-          salario_base REAL NOT NULL DEFAULT 15000,
-          data_admissao TEXT,
-          usuario_id INTEGER,
-          empresa_nome TEXT DEFAULT 'RHINO CARGO, LIMITADA',
-          empresa_nuit TEXT DEFAULT '400582914',
-          empresa_localizacao TEXT DEFAULT 'Porto de Maputo, Recinto Portuário, Maputo, Moçambique'
-        )
-      `);
-
-      try { await run("ALTER TABLE funcionarios ADD COLUMN empresa_nome TEXT DEFAULT 'RHINO CARGO, LIMITADA'"); } catch (e) {}
-      try { await run("ALTER TABLE funcionarios ADD COLUMN empresa_nuit TEXT DEFAULT '400582914'"); } catch (e) {}
-      try { await run("ALTER TABLE funcionarios ADD COLUMN empresa_localizacao TEXT DEFAULT 'Porto de Maputo, Recinto Portuário, Maputo, Moçambique'"); } catch (e) {}
-
-      // VIEW named motoristas
-      await run("DROP VIEW IF EXISTS motoristas");
-      await run(`
-        CREATE VIEW IF NOT EXISTS motoristas AS 
-        SELECT id, nome, email, telefone, carta_conducao, validade_carta, ativo, categoria_carta, bi, nuit, observacoes, score 
-        FROM funcionarios 
-        WHERE cargo = 'Motorista' OR cargo = 'motorista'
-      `);
-
-      // 4. bombas
-      await run(`
-        CREATE TABLE IF NOT EXISTS bombas (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          nome TEXT NOT NULL,
-          endereco TEXT NOT NULL,
-          contacto TEXT NOT NULL,
-          provincia TEXT NOT NULL,
-          ativo INTEGER NOT NULL DEFAULT 1,
-          preco_diesel REAL,
-          preco_gasolina REAL,
-          preco_gas REAL
-        )
-      `);
-
-      // 5. viaturas
-      await run(`
-        CREATE TABLE IF NOT EXISTS viaturas (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          matricula TEXT UNIQUE NOT NULL,
-          marca TEXT NOT NULL,
-          modelo TEXT NOT NULL,
-          tipo TEXT NOT NULL,
-          ano INTEGER NOT NULL,
-          kilometragem REAL NOT NULL,
-          km_atual REAL NOT NULL,
-          capacidade REAL NOT NULL,
-          combustivel TEXT NOT NULL,
-          estado TEXT NOT NULL,
-          observacoes TEXT
-        )
-      `);
-
-      // 6. viagens
-      await run(`
-        CREATE TABLE IF NOT EXISTS viagens (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          numero_viagem TEXT UNIQUE NOT NULL,
-          data_partida TEXT NOT NULL,
-          data_chegada TEXT,
-          viatura_id INTEGER NOT NULL,
-          motorista_id INTEGER NOT NULL,
-          bomba_id INTEGER,
-          litros_bomba REAL NOT NULL,
-          litros_sistema REAL NOT NULL,
-          diferenca_litros REAL NOT NULL,
-          total_combustivel_mzn REAL NOT NULL,
-          cliente TEXT NOT NULL,
-          produto TEXT NOT NULL,
-          origem TEXT NOT NULL,
-          destino TEXT NOT NULL,
-          p_o TEXT,
-          origem_combustivel TEXT,
-          combustivel_gasto_mzn REAL NOT NULL,
-          expediente TEXT,
-          reforcos TEXT,
-          intermediacao_mzn REAL NOT NULL,
-          escolta_mzn REAL NOT NULL,
-          quebras_faltas_mzn REAL NOT NULL,
-          faturacao_mzn REAL NOT NULL,
-          total_remanescente_mzn REAL NOT NULL,
-          estado TEXT NOT NULL,
-          observacoes TEXT
-        )
-      `);
-
-      // 7. abastecimentos
-      await run(`
-        CREATE TABLE IF NOT EXISTS abastecimentos (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          viatura_id INTEGER NOT NULL,
-          viagem TEXT,
-          cliente TEXT,
-          data_abastecimento TEXT NOT NULL,
-          bomba_name TEXT NOT NULL,
-          provincia TEXT NOT NULL,
-          bomba_litros REAL NOT NULL,
-          sistema_litros REAL NOT NULL,
-          diferenca REAL NOT NULL,
-          valor_combustivel REAL NOT NULL,
-          valor_unitario REAL NOT NULL,
-          observacoes TEXT
-        )
-      `);
-
-      // 8. alertas
-      await run(`
-        CREATE TABLE IF NOT EXISTS alertas (
-          id TEXT PRIMARY KEY,
-          data_hora TEXT NOT NULL,
-          tipo TEXT NOT NULL,
-          titulo TEXT NOT NULL,
-          mensagem TEXT NOT NULL,
-          resolvido INTEGER NOT NULL DEFAULT 0,
-          gravidade TEXT NOT NULL,
-          meta TEXT
-        )
-      `);
-
-      // 9. despesas_gerais
-      await run(`
-        CREATE TABLE IF NOT EXISTS despesas_gerais (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          descricao TEXT NOT NULL,
-          categoria TEXT NOT NULL,
-          valor REAL NOT NULL,
-          data_despesa TEXT NOT NULL,
-          funcionario_id INTEGER,
-          viatura_id INTEGER,
-          estado TEXT NOT NULL DEFAULT 'Pago',
-          observacoes TEXT
-        )
-      `);
-
-      // 10. pedidos_rh
-      await run(`
-        CREATE TABLE IF NOT EXISTS pedidos_rh (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          funcionario_id INTEGER NOT NULL,
-          tipo TEXT NOT NULL,
-          data_inicio TEXT NOT NULL,
-          data_fim TEXT NOT NULL,
-          dias INTEGER NOT NULL,
-          motivo TEXT,
-          estado TEXT NOT NULL DEFAULT 'Pendente',
-          data_pedido TEXT NOT NULL,
-          observacoes TEXT
-        )
-      `);
-
-      // 11. recibos_salarios
-      await run(`
-        CREATE TABLE IF NOT EXISTS recibos_salarios (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          funcionario_id INTEGER NOT NULL,
-          mes_ano TEXT NOT NULL,
-          salario_base REAL NOT NULL,
-          bonus REAL NOT NULL DEFAULT 0,
-          descontos REAL NOT NULL DEFAULT 0,
-          salario_liquido REAL NOT NULL,
-          data_emissao TEXT NOT NULL,
-          estado TEXT NOT NULL DEFAULT 'Pago',
-          observacoes TEXT,
-          faltas REAL NOT NULL DEFAULT 0,
-          subsidios REAL NOT NULL DEFAULT 0,
-          horas_extras REAL NOT NULL DEFAULT 0,
-          inss REAL NOT NULL DEFAULT 0,
-          irps REAL NOT NULL DEFAULT 0
-        )
-      `);
-
-      try { await run("ALTER TABLE recibos_salarios ADD COLUMN faltas REAL NOT NULL DEFAULT 0"); } catch (e) {}
-      try { await run("ALTER TABLE recibos_salarios ADD COLUMN subsidios REAL NOT NULL DEFAULT 0"); } catch (e) {}
-      try { await run("ALTER TABLE recibos_salarios ADD COLUMN horas_extras REAL NOT NULL DEFAULT 0"); } catch (e) {}
-      try { await run("ALTER TABLE recibos_salarios ADD COLUMN inss REAL NOT NULL DEFAULT 0"); } catch (e) {}
-      try { await run("ALTER TABLE recibos_salarios ADD COLUMN irps REAL NOT NULL DEFAULT 0"); } catch (e) {}
-
-      // 12. auditoria_logs
-      await run(`
-        CREATE TABLE IF NOT EXISTS auditoria_logs (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          usuario_id INTEGER,
-          usuario_nome TEXT NOT NULL,
-          acao TEXT NOT NULL,
-          detalhes TEXT NOT NULL,
-          data_hora TEXT NOT NULL,
-          ip_address TEXT
-        )
-      `);
-    }
+    // 12. auditoria_logs
+    await run(`
+      CREATE TABLE IF NOT EXISTS auditoria_logs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        usuario_id INT,
+        usuario_nome VARCHAR(255) NOT NULL,
+        acao VARCHAR(255) NOT NULL,
+        detalhes TEXT NOT NULL,
+        data_hora VARCHAR(50) NOT NULL,
+        ip_address VARCHAR(100)
+      )
+    `);
 
     console.log("[Database] Database schema validated/created successfully.");
 
-    // Dynamic Safe Seeding (only inserts missing records to prevent wiping production database data!)
-    
     // 1. Seed precos_provincias
     const provinceCountResult = await get<any>("SELECT COUNT(*) as count FROM precos_provincias");
-    const provinceCount = provinceCountResult?.count !== undefined ? provinceCountResult.count : (provinceCountResult ? Object.values(provinceCountResult)[0] : 0);
+    const provinceCount = provinceCountResult?.count || 0;
     if (Number(provinceCount) === 0) {
       console.log("[Database] Seeding initial province prices...");
       const provinces = [
@@ -639,7 +366,7 @@ async function initializeDatabase() {
 
     // 2. Seed usuarios
     const userCountResult = await get<any>("SELECT COUNT(*) as count FROM usuarios");
-    const userCount = userCountResult?.count !== undefined ? userCountResult.count : (userCountResult ? Object.values(userCountResult)[0] : 0);
+    const userCount = userCountResult?.count || 0;
     if (Number(userCount) === 0) {
       console.log("[Database] Seeding administrative users...");
       await run("INSERT INTO usuarios (id, email, senha, nome, role) VALUES (1, 'walter', ?, 'Walter Juvencio Chauchau', 'admin')", [hashPassword("walter.123")]);
@@ -660,14 +387,14 @@ async function initializeDatabase() {
 
     // 3. Seed initial auditoria_logs
     const logCountResult = await get<any>("SELECT COUNT(*) as count FROM auditoria_logs");
-    const logCount = logCountResult?.count !== undefined ? logCountResult.count : (logCountResult ? Object.values(logCountResult)[0] : 0);
+    const logCount = logCountResult?.count || 0;
     if (Number(logCount) === 0) {
       await logActivity(null, "Sistema", "Inicialização", "Banco de dados inicializado com sucesso.");
     }
 
     // 4. Seed funcionarios & motoristas
     const funcCountResult = await get<any>("SELECT COUNT(*) as count FROM funcionarios");
-    const funcCount = funcCountResult?.count !== undefined ? funcCountResult.count : (funcCountResult ? Object.values(funcCountResult)[0] : 0);
+    const funcCount = funcCountResult?.count || 0;
     if (Number(funcCount) === 0) {
       console.log("[Database] Seeding initial staff & official drivers...");
       await run(`
@@ -687,7 +414,7 @@ async function initializeDatabase() {
         VALUES (13, 'Nilda Magumane', 'nilda@gmail.com', '+258 82 555 1234', 1, '1234567890', '555444333', 'Diretora de Recursos Humanos', 100, 'Recursos Humanos', 25000, '2024-02-10', 4)
       `);
 
-      // Seeding drivers extracted from identification documents
+      // Seeding drivers
       await run(`
         INSERT INTO funcionarios (id, nome, email, telefone, ativo, bi, nuit, observacoes, score, cargo, salario_base, data_admissao, carta_conducao, validade_carta, categoria_carta)
         VALUES (14, 'Hélio Salomão Machava', 'helio.machava@rhinocargo.co.mz', '+258 84 100 2001', 1, '110143498V', '110143498', 'Motorista de Rota Nacional (Carta Temporária)', 100, 'Motorista', 18500, '2024-04-10', '110143498V', '2028-12-31', 'CE')
@@ -712,7 +439,7 @@ async function initializeDatabase() {
 
     // 5. Seed bombas
     const bombaCountResult = await get<any>("SELECT COUNT(*) as count FROM bombas");
-    const bombaCount = bombaCountResult?.count !== undefined ? bombaCountResult.count : (bombaCountResult ? Object.values(bombaCountResult)[0] : 0);
+    const bombaCount = bombaCountResult?.count || 0;
     if (Number(bombaCount) === 0) {
       console.log("[Database] Seeding official gas stations...");
       const pumps = [
@@ -723,8 +450,6 @@ async function initializeDatabase() {
         [5, "Bomba Petromoc - Tete Centro", "Av. da Independência, Tete", "+258 86 444 8888", "Tete", 1, 121.64, 99.08, 92.0],
         [6, "Bomba TotalEnergies - Chokwé", "Av. Principal, Chokwé", "+258 87 333 1111", "Gaza", 1, 116.25, 93.69, 91.2],
         [7, "Bomba Engen - Maxixe Centro", "EN1, Maxixe", "+258 84 222 9999", "Inhambane", 1, 116.25, 93.69, 91.5],
-
-        // Som Petroleum & Capital Oil in Base Regions
         [8, "Som Petroleum - Maputo Cidade", "Av. de Angola, Maputo", "+258 84 100 1101", "Maputo Cidade", 1, 116.25, 93.69, 90.0],
         [9, "Capital Oil - Maputo Cidade", "Av. das Indústrias, Maputo", "+258 84 100 1102", "Maputo Cidade", 1, 116.25, 93.69, 90.0],
         [10, "Som Petroleum - Matola", "Av. União Moçambicana, Matola", "+258 84 100 1103", "Maputo Província", 1, 116.25, 93.69, 90.0],
@@ -735,32 +460,18 @@ async function initializeDatabase() {
         [15, "Capital Oil - Nacala", "Av. Principal do Porto, Nacala", "+258 84 100 1108", "Nampula", 1, 116.25, 93.69, 91.8],
         [16, "Som Petroleum - Pemba", "Av. Marginal, Pemba", "+258 84 100 1109", "Cabo Delgado", 1, 116.25, 93.69, 92.5],
         [17, "Capital Oil - Pemba", "Bairro Natite, Pemba", "+258 84 100 1110", "Cabo Delgado", 1, 116.25, 93.69, 92.5],
-
-        // Niassa
         [18, "Som Petroleum - Lichinga", "Av. do Trabalho, Lichinga", "+258 84 100 1111", "Niassa", 1, 123.27, 100.71, 93.0],
         [19, "Capital Oil - Lichinga", "Av. de Moçambique, Lichinga", "+258 84 100 1112", "Niassa", 1, 123.27, 100.71, 93.0],
-
-        // Tete
         [20, "Som Petroleum - Tete", "Av. 25 de Junho, Tete", "+258 84 100 1113", "Tete", 1, 121.64, 99.08, 92.0],
         [21, "Capital Oil - Tete", "Estrada Nacional EN103, Tete", "+258 84 100 1114", "Tete", 1, 121.64, 99.08, 92.0],
-
-        // Zambézia
         [22, "Som Petroleum - Quelimane", "Av. Julius Nyerere, Quelimane", "+258 84 100 1115", "Zambézia", 1, 120.70, 98.14, 91.7],
         [23, "Capital Oil - Quelimane", "Av. Marginal de Quelimane, Quelimane", "+258 84 100 1116", "Zambézia", 1, 120.70, 98.14, 91.7],
-
-        // Cabo Delgado
         [24, "Som Petroleum - Mueda", "Estrada de Mueda, Mueda", "+258 84 100 1117", "Cabo Delgado", 1, 131.85, 0.0, 92.5],
         [25, "Capital Oil - Palma", "Zona de Desenvolvimento, Palma", "+258 84 100 1118", "Cabo Delgado", 1, 131.85, 0.0, 92.5],
-
-        // Mecula
         [26, "Som Petroleum - Mecula", "Estrada Principal EN14, Mecula", "+258 84 100 1119", "Niassa", 1, 126.27, 0.0, 93.0],
         [27, "Capital Oil - Mecula", "Centro Comercial Mecula, Mecula", "+258 84 100 1120", "Niassa", 1, 126.27, 0.0, 93.0],
-
-        // Zumbo
         [28, "Som Petroleum - Zumbo", "Bairro Fluvial, Zumbo", "+258 84 100 1121", "Tete", 1, 0.0, 101.67, 92.0],
         [29, "Capital Oil - Zumbo", "Estrada de Acesso Zumbo, Zumbo", "+258 84 100 1122", "Tete", 1, 0.0, 101.67, 92.0],
-
-        // Key refueling points for Rhino Cargo (Machava, Marracuene, Inhope, Nampula)
         [30, "Som Petroleum - Machava", "Cruzamento da Machava, Matola", "+258 84 100 1123", "Maputo Província", 1, 116.25, 93.69, 90.0],
         [31, "Capital Oil - Machava", "Av. das Indústrias, Machava, Matola", "+258 84 100 1124", "Maputo Província", 1, 116.25, 93.69, 90.0],
         [32, "Som Petroleum - Marracuene", "Estrada Nacional EN1, Marracuene", "+258 84 100 1125", "Maputo Província", 1, 116.25, 93.69, 90.0],
@@ -798,10 +509,8 @@ app.post("/api/auth/login", async (req, res) => {
   try {
     const user = await get<any>("SELECT id, email, nome, role, senha FROM usuarios WHERE email = ? OR nome = ?", [email, email]);
     if (user && verifyPassword(senha, user.senha)) {
-      // Find linked employee profile
       const emp = await get<any>("SELECT id, cargo, score FROM funcionarios WHERE usuario_id = ? OR email = ? OR nome = ?", [user.id, user.email, user.nome]);
       
-      // Remove sensitive password from response object
       delete user.senha;
 
       const enrichedUser = {
@@ -811,12 +520,10 @@ app.post("/api/auth/login", async (req, res) => {
         score: emp ? emp.score : 100
       };
 
-      // Audit Log for successful login
       await logActivity(user.id, user.nome, "Autenticação", "Sessão iniciada no sistema com sucesso.");
 
       res.json({ success: true, user: enrichedUser });
     } else {
-      // Audit failure attempt
       await logActivity(null, "Convidado", "Falha de Autenticação", `Tentativa fracassada de login para o usuário: ${email}`);
       res.status(401).json({ success: false, message: "Credenciais inválidas." });
     }
@@ -898,7 +605,7 @@ app.delete("/api/viaturas/:id", async (req, res) => {
   }
 });
 
-// 4. Motoristas (Drivers - Now mapped to funcionarios table)
+// 4. Motoristas
 app.get("/api/motoristas", async (req, res) => {
   try {
     const list = await query("SELECT * FROM funcionarios WHERE cargo = 'Motorista' OR cargo = 'motorista' ORDER BY nome ASC");
@@ -911,7 +618,6 @@ app.get("/api/motoristas", async (req, res) => {
 app.post("/api/motoristas", async (req, res) => {
   const { nome, email, telefone, carta_conducao, validade_carta, ativo, categoria_carta, bi, nuit, observacoes, score } = req.body;
   try {
-    // Generate credentials
     const username = nome
       .toLowerCase()
       .normalize("NFD")
@@ -920,13 +626,11 @@ app.post("/api/motoristas", async (req, res) => {
     const password = `${username}.123`;
     const hashedPassword = hashPassword(password);
 
-    // Insert into usuarios table
     const userResult = await run(`
       INSERT INTO usuarios (email, senha, nome, role)
       VALUES (?, ?, ?, 'funcionario')
     `, [username, hashedPassword, nome]);
 
-    // Insert into master funcionarios table with cargo = 'Motorista'
     await run(
       `INSERT INTO funcionarios (nome, email, telefone, carta_conducao, validade_carta, ativo, categoria_carta, bi, nuit, observacoes, score, cargo, salario_base, data_admissao, usuario_id)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Motorista', 18500, ?, ?)`,
@@ -939,7 +643,6 @@ app.post("/api/motoristas", async (req, res) => {
       ]
     );
 
-    // Log the creation
     await logActivity(null, "Recursos Humanos", "Registo de Motorista", `Motorista "${nome}" registado com usuário de login "${username}".`);
 
     res.json({ 
@@ -955,7 +658,6 @@ app.put("/api/motoristas/:id", async (req, res) => {
   const { id } = req.params;
   const { nome, email, telefone, carta_conducao, validade_carta, ativo, categoria_carta, bi, nuit, observacoes, score } = req.body;
   try {
-    // Sync name in usuarios if matched
     const existing = await get<any>("SELECT usuario_id FROM funcionarios WHERE id = ?", [id]);
     if (existing && existing.usuario_id) {
       await run("UPDATE usuarios SET nome = ? WHERE id = ?", [nome, existing.usuario_id]);
@@ -967,7 +669,6 @@ app.put("/api/motoristas/:id", async (req, res) => {
       [nome, email, telefone, carta_conducao, validade_carta, ativo, categoria_carta, bi, nuit, observacoes, score, id]
     );
 
-    // Log the update
     await logActivity(null, "Recursos Humanos", "Edição de Motorista", `Motorista ID ${id} (${nome}) atualizado.`);
 
     res.json({ success: true, message: "Motorista atualizado com sucesso." });
@@ -985,7 +686,6 @@ app.delete("/api/motoristas/:id", async (req, res) => {
     }
     await run("DELETE FROM funcionarios WHERE id = ?", [id]);
 
-    // Log deletion
     const mName = existing ? existing.nome : `ID ${id}`;
     await logActivity(null, "Administrador/RH", "Exclusão de Motorista", `Motorista "${mName}" removido permanentemente.`);
 
@@ -1079,7 +779,7 @@ app.put("/api/alertas/:id/resolver", async (req, res) => {
   }
 });
 
-// 8. Viagens (Trips) - Rich endpoints
+// 8. Viagens (Trips)
 app.get("/api/viagens", async (req, res) => {
   try {
     const list = await query(`
@@ -1117,7 +817,6 @@ app.post("/api/viagens", async (req, res) => {
   } = req.body;
 
   try {
-    // 1. Resolve vehicle and pump prices to do calculations
     const viatura = await get<any>("SELECT * FROM viaturas WHERE id = ?", [viatura_id]);
     if (!viatura) {
       return res.status(404).json({ success: false, message: "Viatura não encontrada." });
@@ -1128,8 +827,7 @@ app.post("/api/viagens", async (req, res) => {
       return res.status(404).json({ success: false, message: "Bomba não encontrada." });
     }
 
-    // Determine fuel price per liter
-    let valor_unitario = 91.5; // default fallback
+    let valor_unitario = 91.5;
     const fuelType = viatura.combustivel.toLowerCase();
 
     if (fuelType.includes("diesel")) {
@@ -1140,7 +838,6 @@ app.post("/api/viagens", async (req, res) => {
       valor_unitario = bomba.preco_gas || 0;
     }
 
-    // If pump doesn't have custom price, load province price
     if (valor_unitario === 0) {
       const provPrice = await get<any>("SELECT * FROM precos_provincias WHERE provincia = ?", [bomba.provincia]);
       if (provPrice) {
@@ -1150,11 +847,9 @@ app.post("/api/viagens", async (req, res) => {
       }
     }
 
-    // Calculate totals
     const total_combustivel_mzn = litros_bomba * valor_unitario;
     const diferenca_litros = litros_bomba - litros_sistema;
 
-    // 2. Insert Voyage
     const result = await run(
       `INSERT INTO viagens (
         numero_viagem, data_partida, data_chegada, viatura_id, motorista_id, bomba_id,
@@ -1178,13 +873,12 @@ app.post("/api/viagens", async (req, res) => {
         produto,
         origem,
         destino,
-        total_combustivel_mzn, // Initial fuel cost is the spent fuel
+        total_combustivel_mzn,
         "em_curso",
         observacoes
       ]
     );
 
-    // 3. Register fuel record in abastecimentos
     await run(
       `INSERT INTO abastecimentos (
         viatura_id, viagem, cliente, data_abastecimento, bomba_name, provincia,
@@ -1206,10 +900,8 @@ app.post("/api/viagens", async (req, res) => {
       ]
     );
 
-    // 4. Update vehicle state
     await run("UPDATE viaturas SET estado = 'Em Viagem' WHERE id = ?", [viatura_id]);
 
-    // 5. Check for consumption deviation and trigger automatic alert
     const percentDev = litros_sistema > 0 ? (Math.abs(diferenca_litros) / litros_sistema) * 100 : 0;
     if (Math.abs(diferenca_litros) >= 5 || percentDev >= 3) {
       const alertId = `ALERT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -1228,7 +920,6 @@ app.post("/api/viagens", async (req, res) => {
          ]
       );
 
-      // Decrement driver score slightly due to fuel deviation
       await run("UPDATE motoristas SET score = MAX(0, score - 5) WHERE id = ?", [motorista_id]);
     }
 
@@ -1262,20 +953,13 @@ app.put("/api/viagens/:id", async (req, res) => {
       return res.status(404).json({ success: false, message: "Viagem não encontrada." });
     }
 
-    // Get fuel cost (constant from initial refuel)
     const combustivel_gasto_mzn = trip.total_combustivel_mzn;
-
-    // Intermediate, Escort, Breakages/Shortages and Billing details
     const intermediacao = Number(intermediacao_mzn || 0);
     const escolta = Number(escolta_mzn || 0);
     const quebras = Number(quebras_faltas_mzn || 0);
     const faturacao = Number(faturacao_mzn || 0);
-
-    // Calculate total remaining
-    // total_remanescente = faturacao - (combustivel_gasto + intermediacao + escolta + quebras)
     const total_remanescente_mzn = faturacao - (combustivel_gasto_mzn + intermediacao + escolta + quebras);
 
-    // Update query
     await run(
       `UPDATE viagens SET
         estado = ?,
@@ -1308,7 +992,6 @@ app.put("/api/viagens/:id", async (req, res) => {
       ]
     );
 
-    // If the trip is finished (concluida), update vehicle status and current mileage
     if (estado === "concluida") {
       await run("UPDATE viaturas SET estado = 'Disponível' WHERE id = ?", [trip.viatura_id]);
       if (km_chegada) {
@@ -1322,9 +1005,7 @@ app.put("/api/viagens/:id", async (req, res) => {
   }
 });
 
-// ---------------- ADDITIONAL ADVANCED HR & FLEET MANAGEMENT ROUTES ----------------
-
-// 1. General Employees (Funcionários) CRUD
+// 9. Funcionários (Employees) CRUD
 app.get("/api/funcionarios", async (req, res) => {
   try {
     const list = await query("SELECT * FROM funcionarios ORDER BY nome ASC");
@@ -1341,7 +1022,6 @@ app.post("/api/funcionarios", async (req, res) => {
     empresa_nome, empresa_nuit, empresa_localizacao 
   } = req.body;
   try {
-    // Generate credentials
     const username = nome
       .toLowerCase()
       .normalize("NFD")
@@ -1350,7 +1030,6 @@ app.post("/api/funcionarios", async (req, res) => {
     const password = `${username}.123`;
     const hashedPassword = hashPassword(password);
 
-    // Map cargo to user role
     let userRole = "funcionario";
     const cargoLower = (cargo || "").toLowerCase();
     if (cargoLower.includes("it") || cargoLower.includes("admin")) {
@@ -1361,13 +1040,11 @@ app.post("/api/funcionarios", async (req, res) => {
       userRole = "administracao";
     }
 
-    // Insert into usuarios
     const userResult = await run(`
       INSERT INTO usuarios (email, senha, nome, role)
       VALUES (?, ?, ?, ?)
     `, [username, hashedPassword, nome, userRole]);
 
-    // Insert into funcionarios
     await run(`
       INSERT INTO funcionarios (
         nome, email, telefone, carta_conducao, validade_carta, ativo, categoria_carta, 
@@ -1389,7 +1066,6 @@ app.post("/api/funcionarios", async (req, res) => {
       empresa_localizacao || 'Porto de Maputo, Recinto Portuário, Maputo, Moçambique'
     ]);
 
-    // Log the creation
     await logActivity(null, "Recursos Humanos", "Registo de Funcionário", `Funcionário "${nome}" (${cargo}) registado com usuário "${username}".`);
 
     res.json({
@@ -1411,7 +1087,6 @@ app.put("/api/funcionarios/:id", async (req, res) => {
   try {
     const existing = await get<any>("SELECT * FROM funcionarios WHERE id = ?", [id]);
     if (existing && existing.usuario_id) {
-      // Sync role in usuarios if cargo changes
       let userRole = "funcionario";
       const cargoLower = (cargo || "").toLowerCase();
       if (cargoLower.includes("it") || cargoLower.includes("admin")) {
@@ -1438,7 +1113,6 @@ app.put("/api/funcionarios/:id", async (req, res) => {
       id
     ]);
 
-    // Log update
     await logActivity(null, "Recursos Humanos", "Edição de Funcionário", `Funcionário ID ${id} (${nome}) atualizado.`);
 
     res.json({ success: true, message: "Funcionário atualizado com sucesso." });
@@ -1456,7 +1130,6 @@ app.delete("/api/funcionarios/:id", async (req, res) => {
     }
     await run("DELETE FROM funcionarios WHERE id = ?", [id]);
 
-    // Log deletion
     const fName = existing ? existing.nome : `ID ${id}`;
     await logActivity(null, "Administrador/RH", "Exclusão de Funcionário", `Funcionário "${fName}" removido permanentemente do sistema.`);
 
@@ -1466,7 +1139,7 @@ app.delete("/api/funcionarios/:id", async (req, res) => {
   }
 });
 
-// 2. General Company Expenses (Despesas Gerais) CRUD
+// 10. Despesas Gerais
 app.get("/api/despesas_gerais", async (req, res) => {
   try {
     const list = await query(`
@@ -1520,7 +1193,7 @@ app.delete("/api/despesas_gerais/:id", async (req, res) => {
   }
 });
 
-// 3. HR Request Orders (Pedidos de Férias e Dispensas) CRUD
+// 11. HR Requests
 app.get("/api/pedidos_rh", async (req, res) => {
   try {
     const list = await query(`
@@ -1572,7 +1245,7 @@ app.delete("/api/pedidos_rh/:id", async (req, res) => {
   }
 });
 
-// 4. Payslips (Recibos de Salários) CRUD
+// 12. Payslips
 app.get("/api/recibos_salarios", async (req, res) => {
   try {
     const list = await query(`
@@ -1698,16 +1371,14 @@ app.delete("/api/recibos_salarios/:id", async (req, res) => {
   }
 });
 
-// 9. Performance Statistics Dashboard Data
+// 13. Performance Statistics Dashboard Data
 app.get("/api/performance", async (req, res) => {
   try {
-    // Basic fleet metrics
     const totalV = await get<{ count: number }>("SELECT COUNT(*) as count FROM viaturas");
     const activeV = await get<{ count: number }>("SELECT COUNT(*) as count FROM viaturas WHERE estado = 'Em Viagem'");
     const totalM = await get<{ count: number }>("SELECT COUNT(*) as count FROM motoristas");
     const resolvedA = await get<{ count: number }>("SELECT COUNT(*) as count FROM alertas WHERE resolvido = 0");
 
-    // Financial summaries
     const financials = await get<any>(`
       SELECT 
         SUM(faturacao_mzn) as total_faturacao,
@@ -1719,7 +1390,6 @@ app.get("/api/performance", async (req, res) => {
       FROM viagens
     `);
 
-    // Fuel deviation total
     const deviationStats = await get<any>(`
       SELECT 
         SUM(ABS(diferenca_litros)) as total_desvio_litros,
@@ -1727,14 +1397,12 @@ app.get("/api/performance", async (req, res) => {
       FROM viagens
     `);
 
-    // Driver score averages
     const driversPerformance = await query(`
       SELECT nome, score, email, telefone, categoria_carta, bi
       FROM motoristas
       ORDER BY score DESC, nome ASC
     `);
 
-    // Fuel consumption and trips by province
     const fuelByProvince = await query(`
       SELECT b.provincia, SUM(a.bomba_litros) as total_litros, SUM(a.valor_combustivel) as total_gasto
       FROM abastecimentos a
@@ -1743,7 +1411,6 @@ app.get("/api/performance", async (req, res) => {
       ORDER BY total_gasto DESC
     `);
 
-    // Trips over time
     const tripsHistory = await query(`
       SELECT id, numero_viagem, data_partida, total_combustivel_mzn, faturacao_mzn, total_remanescente_mzn, estado, cliente
       FROM viagens
@@ -1774,7 +1441,7 @@ app.get("/api/performance", async (req, res) => {
   }
 });
 
-// 13. System Audit Log / Registo de Atividades
+// 14. System Audit Log
 app.get("/api/auditoria_logs", async (req, res) => {
   try {
     const logs = await query("SELECT * FROM auditoria_logs ORDER BY id DESC LIMIT 500");
@@ -1793,7 +1460,6 @@ app.post("/api/auditoria_logs/clear", async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
-
 
 // ---------------- VITE MIDDLEWARE CONFIG ----------------
 
