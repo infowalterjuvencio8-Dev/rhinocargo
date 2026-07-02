@@ -1,0 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-rhino-blue: #2E4399;
+  --color-rhino-pink: #E9008C;
+  --color-rhino-green: #32B64A;
+  --color-rhino-dark: #070913;
+  --color-rhino-card: #0F1329;
+  --color-rhino-muted: #1A2142;
+  --color-rhino-border: #232C59;
+}
+
+@layer base {
+  body {
+    @apply font-sans bg-rhino-dark text-slate-100 antialiased;
+  }
+}
+
+/* Custom prints styling */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background-color: white !important;
+    color: black !important;
+  }
+  .print-card {
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+    color: black !important;
+    background: white !important;
+    page-break-inside: avoid;
+  }
+}

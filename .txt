@@ -1,0 +1,6 @@
+O sistema adota uma arquitetura de pilha completa moderna (Full-Stack) desenvolvida com as seguintes tecnologias principais:
+TypeScript: Utilizado em 100% da lógica tanto do lado do cliente (Frontend) quanto do lado do servidor (Backend/API) para garantir tipagem estática segura, diminuindo erros em tempo de execução.
+React 18 & Vite: Biblioteca principal para renderização de interfaces reativas e rápidas baseadas em componentes dinâmicos no navegador.
+Node.js & Express: O servidor backend que gerencia as rotas de API, autenticação segura, e as sessões de usuários.
+Tailwind CSS: Utilizado para estilização visual de alta fidelidade técnica, design responsivo de ponta e interface no tema escuro.
+SQL (MySQL & SQLite): Linguagem de manipulação de banco de dados estruturado. O sistema possui compatibilidade inteligente com MySQL e conta com um mecanismo automático de fallback para SQLite, garantindo que o software funcione sem interrupções mesmo durante fases de testes offline.
