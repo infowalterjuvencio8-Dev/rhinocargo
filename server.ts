@@ -446,18 +446,26 @@ async function initializeDatabase() {
   await initializeDatabase();
 })();
 
-// ---------------- REST API ROUTES (COMPLETE) ----------------
+// ---------------- REST API ROUTES (COMPLETE WITH ::text FIX) ----------------
 
-// 1. Authentication
+// 1. Authentication - CORRIGIDO para PostgreSQL
 app.post("/api/auth/login", async (req, res) => {
   const { email, senha } = req.body;
   if (!email || !senha) {
     return res.status(400).json({ success: false, message: "Email ou Usuário e senha são obrigatórios." });
   }
   try {
-    const user = await get<any>("SELECT id, email, nome, role, senha FROM usuarios WHERE email = $1 OR nome = $1", [email]);
+    // 🔧 FIX: Usa ::text para converter o parâmetro para texto
+    const user = await get<any>(
+      "SELECT id, email, nome, role, senha FROM usuarios WHERE email = $1::text OR nome = $1::text", 
+      [String(email)]
+    );
     if (user && verifyPassword(senha, user.senha)) {
-      const emp = await get<any>("SELECT id, cargo, score FROM funcionarios WHERE usuario_id = $1 OR email = $1 OR nome = $1", [user.id]);
+      // 🔧 FIX: Usa ::text nas comparações de texto
+      const emp = await get<any>(
+        "SELECT id, cargo, score FROM funcionarios WHERE usuario_id = $1 OR email = $1::text OR nome = $1::text", 
+        [user.id, user.email, user.nome]
+      );
       delete user.senha;
       const enrichedUser = {
         ...user,
@@ -472,6 +480,7 @@ app.post("/api/auth/login", async (req, res) => {
       res.status(401).json({ success: false, message: "Credenciais inválidas." });
     }
   } catch (error: any) {
+    console.error("[Login Error]", error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -491,7 +500,7 @@ app.put("/api/precos_provincias/:provincia", async (req, res) => {
   const { diesel, gasolina, gas } = req.body;
   try {
     await run(
-      "UPDATE precos_provincias SET diesel = $1, gasolina = $2, gas = $3 WHERE provincia = $4",
+      "UPDATE precos_provincias SET diesel = $1, gasolina = $2, gas = $3 WHERE provincia = $4::text",
       [diesel, gasolina, gas, provincia]
     );
     res.json({ success: true, message: "Preços atualizados com sucesso." });
@@ -709,7 +718,7 @@ app.get("/api/alertas", async (req, res) => {
 app.put("/api/alertas/:id/resolver", async (req, res) => {
   const { id } = req.params;
   try {
-    await run("UPDATE alertas SET resolvido = 1 WHERE id = $1", [id]);
+    await run("UPDATE alertas SET resolvido = 1 WHERE id = $1::text", [id]);
     res.json({ success: true, message: "Alerta resolvido com sucesso." });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
@@ -775,7 +784,7 @@ app.post("/api/viagens", async (req, res) => {
     }
 
     if (valor_unitario === 0) {
-      const provPrice = await get<any>("SELECT * FROM precos_provincias WHERE provincia = $1", [bomba.provincia]);
+      const provPrice = await get<any>("SELECT * FROM precos_provincias WHERE provincia = $1::text", [bomba.provincia]);
       if (provPrice) {
         if (fuelType.includes("diesel")) valor_unitario = provPrice.diesel;
         else if (fuelType.includes("gasolina")) valor_unitario = provPrice.gasolina;
