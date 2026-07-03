@@ -1,62 +1,41 @@
 import "dotenv/config";
 import express from "express";
 import path from "path";
-import mysql from "mysql2/promise";
+import { Pool } from "pg";
 import { createServer as createViteServer } from "vite";
 import crypto from "crypto";
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// Load MySQL Database configurations with default values
-const MYSQL_HOST = process.env.DB_HOST || "localhost";
-const MYSQL_PORT = parseInt(process.env.DB_PORT || "3306", 10);
-const MYSQL_USER = process.env.DB_USER || "root";
-const MYSQL_PASSWORD = process.env.DB_PASSWORD || "";
-const MYSQL_DATABASE = process.env.DB_NAME || "rhinocargo_db";
+// Database configuration using DATABASE_URL from Render
+const DATABASE_URL = process.env.DATABASE_URL;
 
-let mysqlPool: mysql.Pool | null = null;
+let pool: Pool | null = null;
 
 async function connectDatabase() {
+  if (!DATABASE_URL) {
+    console.error("[Database] DATABASE_URL environment variable is not set!");
+    console.error("[Database] Please set DATABASE_URL in your Render environment variables.");
+    process.exit(1);
+  }
+
   try {
-    console.log(`[Database] Attempting to connect to MySQL at ${MYSQL_HOST}:${MYSQL_PORT}...`);
+    console.log("[Database] Attempting to connect to PostgreSQL...");
     
-    // Connect to MySQL server first (without database selected) to create the DB if not exists
-    const tempConnection = await mysql.createConnection({
-      host: MYSQL_HOST,
-      port: MYSQL_PORT,
-      user: MYSQL_USER,
-      password: MYSQL_PASSWORD,
+    pool = new Pool({
+      connectionString: DATABASE_URL,
+      ssl: {
+        rejectUnauthorized: false
+      }
     });
 
-    console.log(`[Database] Connected to MySQL host. Verifying/Creating database "${MYSQL_DATABASE}"...`);
-    await tempConnection.query(`CREATE DATABASE IF NOT EXISTS \`${MYSQL_DATABASE}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
-    await tempConnection.end();
-
-    // Reconnect selecting the target database
-    mysqlPool = mysql.createPool({
-      host: MYSQL_HOST,
-      port: MYSQL_PORT,
-      user: MYSQL_USER,
-      password: MYSQL_PASSWORD,
-      database: MYSQL_DATABASE,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-      enableKeepAlive: true,
-      keepAliveInitialDelay: 0
-    });
-
-    console.log(`[Database] Successfully connected and configured with MySQL database: "${MYSQL_DATABASE}".`);
+    await pool.query('SELECT NOW()');
+    console.log("[Database] Successfully connected to PostgreSQL on Render!");
   } catch (err: any) {
-    console.error(`[Database] MySQL connection failed: ${err.message}`);
-    console.error("[Database] Please check your environment variables:");
-    console.error(`  DB_HOST: ${MYSQL_HOST}`);
-    console.error(`  DB_PORT: ${MYSQL_PORT}`);
-    console.error(`  DB_USER: ${MYSQL_USER}`);
-    console.error(`  DB_NAME: ${MYSQL_DATABASE}`);
+    console.error(`[Database] PostgreSQL connection failed: ${err.message}`);
     process.exit(1);
   }
 }
@@ -83,56 +62,52 @@ async function logActivity(usuario_id: number | null, usuario_nome: string, acao
   try {
     await run(`
       INSERT INTO auditoria_logs (usuario_id, usuario_nome, acao, detalhes, data_hora, ip_address)
-      VALUES (?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6)
     `, [usuario_id, usuario_nome, acao, detalhes, new Date().toISOString(), ip]);
   } catch (err) {
     console.error("Failed to insert audit log:", err);
   }
 }
 
-// Promisified Query Helpers for MySQL
-function query<T>(sql: string, params: any[] = []): Promise<T[]> {
-  if (!mysqlPool) throw new Error("Database not connected");
-  return mysqlPool.execute(sql, params).then(([rows]) => rows as T[]);
+// Promisified Query Helpers for PostgreSQL
+async function query<T>(sql: string, params: any[] = []): Promise<T[]> {
+  if (!pool) throw new Error("Database not connected");
+  const result = await pool.query(sql, params);
+  return result.rows as T[];
 }
 
-function run(sql: string, params: any[] = []): Promise<{ lastID: number; changes: number }> {
-  if (!mysqlPool) throw new Error("Database not connected");
-  return mysqlPool.execute(sql, params).then(([result]) => {
-    return {
-      lastID: (result as any).insertId || 0,
-      changes: (result as any).affectedRows || 0
-    };
-  });
+async function run(sql: string, params: any[] = []): Promise<{ lastID: number; changes: number }> {
+  if (!pool) throw new Error("Database not connected");
+  const result = await pool.query(sql, params);
+  return {
+    lastID: (result as any).rows?.[0]?.id || 0,
+    changes: (result as any).rowCount || 0
+  };
 }
 
-function get<T>(sql: string, params: any[] = []): Promise<T | undefined> {
-  if (!mysqlPool) throw new Error("Database not connected");
-  return mysqlPool.execute(sql, params).then(([rows]) => {
-    const results = rows as any[];
-    return results.length > 0 ? results[0] as T : undefined;
-  });
+async function get<T>(sql: string, params: any[] = []): Promise<T | undefined> {
+  if (!pool) throw new Error("Database not connected");
+  const result = await pool.query(sql, params);
+  return result.rows.length > 0 ? result.rows[0] as T : undefined;
 }
 
 // Database Initialization and Seeding
 async function initializeDatabase() {
   try {
-    console.log("[Database] Constructing MySQL Schema...");
+    console.log("[Database] Constructing PostgreSQL Schema...");
 
-    // 1. precos_provincias
     await run(`
       CREATE TABLE IF NOT EXISTS precos_provincias (
         provincia VARCHAR(100) PRIMARY KEY,
-        diesel DOUBLE NOT NULL,
-        gasolina DOUBLE NOT NULL,
-        gas DOUBLE NOT NULL
+        diesel DOUBLE PRECISION NOT NULL,
+        gasolina DOUBLE PRECISION NOT NULL,
+        gas DOUBLE PRECISION NOT NULL
       )
     `);
 
-    // 2. usuarios
     await run(`
       CREATE TABLE IF NOT EXISTS usuarios (
-        id INT AUTO_INCREMENT PRIMARY KEY,
+        id SERIAL PRIMARY KEY,
         email VARCHAR(255) UNIQUE NOT NULL,
         senha VARCHAR(255) NOT NULL,
         nome VARCHAR(255) NOT NULL,
@@ -140,10 +115,9 @@ async function initializeDatabase() {
       )
     `);
 
-    // 3. funcionarios
     await run(`
       CREATE TABLE IF NOT EXISTS funcionarios (
-        id INT AUTO_INCREMENT PRIMARY KEY,
+        id SERIAL PRIMARY KEY,
         nome VARCHAR(255) NOT NULL,
         email VARCHAR(255) NOT NULL,
         telefone VARCHAR(50) NOT NULL,
@@ -156,7 +130,7 @@ async function initializeDatabase() {
         observacoes TEXT,
         score INT NOT NULL DEFAULT 100,
         cargo VARCHAR(100) NOT NULL DEFAULT 'Motorista',
-        salario_base DOUBLE NOT NULL DEFAULT 15000,
+        salario_base DOUBLE PRECISION NOT NULL DEFAULT 15000,
         data_admissao VARCHAR(50),
         usuario_id INT,
         empresa_nome VARCHAR(255) DEFAULT 'RHINO CARGO, LIMITADA',
@@ -165,7 +139,6 @@ async function initializeDatabase() {
       )
     `);
 
-    // 3.1. view motoristas
     await run("DROP VIEW IF EXISTS motoristas");
     await run(`
       CREATE VIEW motoristas AS 
@@ -174,92 +147,87 @@ async function initializeDatabase() {
       WHERE cargo = 'Motorista' OR cargo = 'motorista'
     `);
 
-    // 4. bombas
     await run(`
       CREATE TABLE IF NOT EXISTS bombas (
-        id INT AUTO_INCREMENT PRIMARY KEY,
+        id SERIAL PRIMARY KEY,
         nome VARCHAR(255) NOT NULL,
         endereco VARCHAR(500) NOT NULL,
         contacto VARCHAR(100) NOT NULL,
         provincia VARCHAR(100) NOT NULL,
         ativo INT NOT NULL DEFAULT 1,
-        preco_diesel DOUBLE,
-        preco_gasolina DOUBLE,
-        preco_gas DOUBLE
+        preco_diesel DOUBLE PRECISION,
+        preco_gasolina DOUBLE PRECISION,
+        preco_gas DOUBLE PRECISION
       )
     `);
 
-    // 5. viaturas
     await run(`
       CREATE TABLE IF NOT EXISTS viaturas (
-        id INT AUTO_INCREMENT PRIMARY KEY,
+        id SERIAL PRIMARY KEY,
         matricula VARCHAR(50) UNIQUE NOT NULL,
         marca VARCHAR(100) NOT NULL,
         modelo VARCHAR(100) NOT NULL,
         tipo VARCHAR(100) NOT NULL,
         ano INT NOT NULL,
-        kilometragem DOUBLE NOT NULL,
-        km_atual DOUBLE NOT NULL,
-        capacidade DOUBLE NOT NULL,
+        kilometragem DOUBLE PRECISION NOT NULL,
+        km_atual DOUBLE PRECISION NOT NULL,
+        capacidade DOUBLE PRECISION NOT NULL,
         combustivel VARCHAR(50) NOT NULL,
         estado VARCHAR(50) NOT NULL,
         observacoes TEXT
       )
     `);
 
-    // 6. viagens
     await run(`
       CREATE TABLE IF NOT EXISTS viagens (
-        id INT AUTO_INCREMENT PRIMARY KEY,
+        id SERIAL PRIMARY KEY,
         numero_viagem VARCHAR(100) UNIQUE NOT NULL,
         data_partida VARCHAR(50) NOT NULL,
         data_chegada VARCHAR(50),
         viatura_id INT NOT NULL,
         motorista_id INT NOT NULL,
         bomba_id INT,
-        litros_bomba DOUBLE NOT NULL,
-        litros_sistema DOUBLE NOT NULL,
-        diferenca_litros DOUBLE NOT NULL,
-        total_combustivel_mzn DOUBLE NOT NULL,
+        litros_bomba DOUBLE PRECISION NOT NULL,
+        litros_sistema DOUBLE PRECISION NOT NULL,
+        diferenca_litros DOUBLE PRECISION NOT NULL,
+        total_combustivel_mzn DOUBLE PRECISION NOT NULL,
         cliente VARCHAR(255) NOT NULL,
         produto VARCHAR(255) NOT NULL,
         origem VARCHAR(255) NOT NULL,
         destino VARCHAR(255) NOT NULL,
         p_o VARCHAR(255),
         origem_combustivel VARCHAR(255),
-        combustivel_gasto_mzn DOUBLE NOT NULL,
+        combustivel_gasto_mzn DOUBLE PRECISION NOT NULL,
         expediente VARCHAR(255),
         reforcos TEXT,
-        intermediacao_mzn DOUBLE NOT NULL,
-        escolta_mzn DOUBLE NOT NULL,
-        quebras_faltas_mzn DOUBLE NOT NULL,
-        faturacao_mzn DOUBLE NOT NULL,
-        total_remanescente_mzn DOUBLE NOT NULL,
+        intermediacao_mzn DOUBLE PRECISION NOT NULL,
+        escolta_mzn DOUBLE PRECISION NOT NULL,
+        quebras_faltas_mzn DOUBLE PRECISION NOT NULL,
+        faturacao_mzn DOUBLE PRECISION NOT NULL,
+        total_remanescente_mzn DOUBLE PRECISION NOT NULL,
         estado VARCHAR(50) NOT NULL,
         observacoes TEXT
       )
     `);
 
-    // 7. abastecimentos
     await run(`
       CREATE TABLE IF NOT EXISTS abastecimentos (
-        id INT AUTO_INCREMENT PRIMARY KEY,
+        id SERIAL PRIMARY KEY,
         viatura_id INT NOT NULL,
         viagem VARCHAR(100),
         cliente VARCHAR(255),
         data_abastecimento VARCHAR(50) NOT NULL,
         bomba_name VARCHAR(255) NOT NULL,
         provincia VARCHAR(100) NOT NULL,
-        bomba_litros DOUBLE NOT NULL,
-        sistema_litros DOUBLE NOT NULL,
-        diferenca DOUBLE NOT NULL,
-        valor_combustivel DOUBLE NOT NULL,
-        valor_unitario DOUBLE NOT NULL,
+        bomba_litros DOUBLE PRECISION NOT NULL,
+        sistema_litros DOUBLE PRECISION NOT NULL,
+        diferenca DOUBLE PRECISION NOT NULL,
+        valor_combustivel DOUBLE PRECISION NOT NULL,
+        valor_unitario DOUBLE PRECISION NOT NULL,
         observacoes TEXT
       )
     `);
 
-    // 8. alertas
     await run(`
       CREATE TABLE IF NOT EXISTS alertas (
         id VARCHAR(100) PRIMARY KEY,
@@ -273,13 +241,12 @@ async function initializeDatabase() {
       )
     `);
 
-    // 9. despesas_gerais
     await run(`
       CREATE TABLE IF NOT EXISTS despesas_gerais (
-        id INT AUTO_INCREMENT PRIMARY KEY,
+        id SERIAL PRIMARY KEY,
         descricao VARCHAR(255) NOT NULL,
         categoria VARCHAR(100) NOT NULL,
-        valor DOUBLE NOT NULL,
+        valor DOUBLE PRECISION NOT NULL,
         data_despesa VARCHAR(50) NOT NULL,
         funcionario_id INT,
         viatura_id INT,
@@ -288,10 +255,9 @@ async function initializeDatabase() {
       )
     `);
 
-    // 10. pedidos_rh
     await run(`
       CREATE TABLE IF NOT EXISTS pedidos_rh (
-        id INT AUTO_INCREMENT PRIMARY KEY,
+        id SERIAL PRIMARY KEY,
         funcionario_id INT NOT NULL,
         tipo VARCHAR(100) NOT NULL,
         data_inicio VARCHAR(50) NOT NULL,
@@ -304,31 +270,29 @@ async function initializeDatabase() {
       )
     `);
 
-    // 11. recibos_salarios
     await run(`
       CREATE TABLE IF NOT EXISTS recibos_salarios (
-        id INT AUTO_INCREMENT PRIMARY KEY,
+        id SERIAL PRIMARY KEY,
         funcionario_id INT NOT NULL,
         mes_ano VARCHAR(50) NOT NULL,
-        salario_base DOUBLE NOT NULL,
-        bonus DOUBLE NOT NULL DEFAULT 0,
-        descontos DOUBLE NOT NULL DEFAULT 0,
-        salario_liquido DOUBLE NOT NULL,
+        salario_base DOUBLE PRECISION NOT NULL,
+        bonus DOUBLE PRECISION NOT NULL DEFAULT 0,
+        descontos DOUBLE PRECISION NOT NULL DEFAULT 0,
+        salario_liquido DOUBLE PRECISION NOT NULL,
         data_emissao VARCHAR(50) NOT NULL,
         estado VARCHAR(50) NOT NULL DEFAULT 'Pago',
         observacoes TEXT,
-        faltas DOUBLE NOT NULL DEFAULT 0,
-        subsidios DOUBLE NOT NULL DEFAULT 0,
-        horas_extras DOUBLE NOT NULL DEFAULT 0,
-        inss DOUBLE NOT NULL DEFAULT 0,
-        irps DOUBLE NOT NULL DEFAULT 0
+        faltas DOUBLE PRECISION NOT NULL DEFAULT 0,
+        subsidios DOUBLE PRECISION NOT NULL DEFAULT 0,
+        horas_extras DOUBLE PRECISION NOT NULL DEFAULT 0,
+        inss DOUBLE PRECISION NOT NULL DEFAULT 0,
+        irps DOUBLE PRECISION NOT NULL DEFAULT 0
       )
     `);
 
-    // 12. auditoria_logs
     await run(`
       CREATE TABLE IF NOT EXISTS auditoria_logs (
-        id INT AUTO_INCREMENT PRIMARY KEY,
+        id SERIAL PRIMARY KEY,
         usuario_id INT,
         usuario_nome VARCHAR(255) NOT NULL,
         acao VARCHAR(255) NOT NULL,
@@ -340,10 +304,9 @@ async function initializeDatabase() {
 
     console.log("[Database] Database schema validated/created successfully.");
 
-    // 1. Seed precos_provincias
+    // Seed data
     const provinceCountResult = await get<any>("SELECT COUNT(*) as count FROM precos_provincias");
-    const provinceCount = provinceCountResult?.count || 0;
-    if (Number(provinceCount) === 0) {
+    if (Number(provinceCountResult?.count || 0) === 0) {
       console.log("[Database] Seeding initial province prices...");
       const provinces = [
         ["Cabo Delgado", 93.1, 87.8, 92.5],
@@ -360,42 +323,21 @@ async function initializeDatabase() {
         ["Zambézia", 92.5, 87.2, 91.7]
       ];
       for (const p of provinces) {
-        await run("INSERT INTO precos_provincias (provincia, diesel, gasolina, gas) VALUES (?, ?, ?, ?)", p);
+        await run("INSERT INTO precos_provincias (provincia, diesel, gasolina, gas) VALUES ($1, $2, $3, $4)", p);
       }
     }
 
-    // 2. Seed usuarios
     const userCountResult = await get<any>("SELECT COUNT(*) as count FROM usuarios");
-    const userCount = userCountResult?.count || 0;
-    if (Number(userCount) === 0) {
+    if (Number(userCountResult?.count || 0) === 0) {
       console.log("[Database] Seeding administrative users...");
-      await run("INSERT INTO usuarios (id, email, senha, nome, role) VALUES (1, 'walter', ?, 'Walter Juvencio Chauchau', 'admin')", [hashPassword("walter.123")]);
-      await run("INSERT INTO usuarios (id, email, senha, nome, role) VALUES (2, 'salvador', ?, 'Salvador Matlombe', 'admin')", [hashPassword("salvador.123")]);
-      await run("INSERT INTO usuarios (id, email, senha, nome, role) VALUES (3, 'clara', ?, 'Clara Tolvela', 'administracao')", [hashPassword("clara.123")]);
-      await run("INSERT INTO usuarios (id, email, senha, nome, role) VALUES (4, 'nilda', ?, 'Nilda Magumane', 'rh')", [hashPassword("nilda.123")]);
+      await run("INSERT INTO usuarios (id, email, senha, nome, role) VALUES (1, 'walter', $1, 'Walter Juvencio Chauchau', 'admin')", [hashPassword("walter.123")]);
+      await run("INSERT INTO usuarios (id, email, senha, nome, role) VALUES (2, 'salvador', $1, 'Salvador Matlombe', 'admin')", [hashPassword("salvador.123")]);
+      await run("INSERT INTO usuarios (id, email, senha, nome, role) VALUES (3, 'clara', $1, 'Clara Tolvela', 'administracao')", [hashPassword("clara.123")]);
+      await run("INSERT INTO usuarios (id, email, senha, nome, role) VALUES (4, 'nilda', $1, 'Nilda Magumane', 'rh')", [hashPassword("nilda.123")]);
     }
 
-    // Hash all legacy/plain text passwords if any
-    const allUsers = await query<any>("SELECT id, senha, nome FROM usuarios");
-    for (const u of allUsers) {
-      if (u.senha && !u.senha.includes(":")) {
-        const hashed = hashPassword(u.senha);
-        await run("UPDATE usuarios SET senha = ? WHERE id = ?", [hashed, u.id]);
-        console.log(`[Security] Hashed plain-text password for user "${u.nome}".`);
-      }
-    }
-
-    // 3. Seed initial auditoria_logs
-    const logCountResult = await get<any>("SELECT COUNT(*) as count FROM auditoria_logs");
-    const logCount = logCountResult?.count || 0;
-    if (Number(logCount) === 0) {
-      await logActivity(null, "Sistema", "Inicialização", "Banco de dados inicializado com sucesso.");
-    }
-
-    // 4. Seed funcionarios & motoristas
     const funcCountResult = await get<any>("SELECT COUNT(*) as count FROM funcionarios");
-    const funcCount = funcCountResult?.count || 0;
-    if (Number(funcCount) === 0) {
+    if (Number(funcCountResult?.count || 0) === 0) {
       console.log("[Database] Seeding initial staff & official drivers...");
       await run(`
         INSERT INTO funcionarios (id, nome, email, telefone, ativo, bi, nuit, observacoes, score, cargo, salario_base, data_admissao, usuario_id)
@@ -413,8 +355,6 @@ async function initializeDatabase() {
         INSERT INTO funcionarios (id, nome, email, telefone, ativo, bi, nuit, observacoes, score, cargo, salario_base, data_admissao, usuario_id)
         VALUES (13, 'Nilda Magumane', 'nilda@gmail.com', '+258 82 555 1234', 1, '1234567890', '555444333', 'Diretora de Recursos Humanos', 100, 'Recursos Humanos', 25000, '2024-02-10', 4)
       `);
-
-      // Seeding drivers
       await run(`
         INSERT INTO funcionarios (id, nome, email, telefone, ativo, bi, nuit, observacoes, score, cargo, salario_base, data_admissao, carta_conducao, validade_carta, categoria_carta)
         VALUES (14, 'Hélio Salomão Machava', 'helio.machava@rhinocargo.co.mz', '+258 84 100 2001', 1, '110143498V', '110143498', 'Motorista de Rota Nacional (Carta Temporária)', 100, 'Motorista', 18500, '2024-04-10', '110143498V', '2028-12-31', 'CE')
@@ -437,10 +377,8 @@ async function initializeDatabase() {
       `);
     }
 
-    // 5. Seed bombas
     const bombaCountResult = await get<any>("SELECT COUNT(*) as count FROM bombas");
-    const bombaCount = bombaCountResult?.count || 0;
-    if (Number(bombaCount) === 0) {
+    if (Number(bombaCountResult?.count || 0) === 0) {
       console.log("[Database] Seeding official gas stations...");
       const pumps = [
         [1, "Bomba Petromoc - Av. 24 de Julho", "Av. 24 de Julho, Maputo Cidade", "+258 84 123 4567", "Maputo Cidade", 1, 116.25, 93.69, 90.0],
@@ -482,7 +420,17 @@ async function initializeDatabase() {
         [37, "Capital Oil - Nampula", "Rota Principal Nacala-Nampula, Nampula", "+258 84 100 1130", "Nampula", 1, 116.25, 93.69, 91.8]
       ];
       for (const p of pumps) {
-        await run("INSERT INTO bombas (id, nome, endereco, contacto, provincia, ativo, preco_diesel, preco_gasolina, preco_gas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", p);
+        await run("INSERT INTO bombas (id, nome, endereco, contacto, provincia, ativo, preco_diesel, preco_gasolina, preco_gas) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)", p);
+      }
+    }
+
+    // Hash passwords
+    const allUsers = await query<any>("SELECT id, senha, nome FROM usuarios");
+    for (const u of allUsers) {
+      if (u.senha && !u.senha.includes(":")) {
+        const hashed = hashPassword(u.senha);
+        await run("UPDATE usuarios SET senha = $1 WHERE id = $2", [hashed, u.id]);
+        console.log(`[Security] Hashed plain-text password for user "${u.nome}".`);
       }
     }
 
@@ -492,13 +440,13 @@ async function initializeDatabase() {
   }
 }
 
-// Kick off Database setup synchronously
+// Kick off Database setup
 (async () => {
   await connectDatabase();
   await initializeDatabase();
 })();
 
-// ---------------- REST API ROUTES ----------------
+// ---------------- REST API ROUTES (COMPLETE) ----------------
 
 // 1. Authentication
 app.post("/api/auth/login", async (req, res) => {
@@ -507,21 +455,17 @@ app.post("/api/auth/login", async (req, res) => {
     return res.status(400).json({ success: false, message: "Email ou Usuário e senha são obrigatórios." });
   }
   try {
-    const user = await get<any>("SELECT id, email, nome, role, senha FROM usuarios WHERE email = ? OR nome = ?", [email, email]);
+    const user = await get<any>("SELECT id, email, nome, role, senha FROM usuarios WHERE email = $1 OR nome = $1", [email]);
     if (user && verifyPassword(senha, user.senha)) {
-      const emp = await get<any>("SELECT id, cargo, score FROM funcionarios WHERE usuario_id = ? OR email = ? OR nome = ?", [user.id, user.email, user.nome]);
-      
+      const emp = await get<any>("SELECT id, cargo, score FROM funcionarios WHERE usuario_id = $1 OR email = $1 OR nome = $1", [user.id]);
       delete user.senha;
-
       const enrichedUser = {
         ...user,
         funcionario_id: emp ? emp.id : null,
         cargo: emp ? emp.cargo : null,
         score: emp ? emp.score : 100
       };
-
       await logActivity(user.id, user.nome, "Autenticação", "Sessão iniciada no sistema com sucesso.");
-
       res.json({ success: true, user: enrichedUser });
     } else {
       await logActivity(null, "Convidado", "Falha de Autenticação", `Tentativa fracassada de login para o usuário: ${email}`);
@@ -547,7 +491,7 @@ app.put("/api/precos_provincias/:provincia", async (req, res) => {
   const { diesel, gasolina, gas } = req.body;
   try {
     await run(
-      "UPDATE precos_provincias SET diesel = ?, gasolina = ?, gas = ? WHERE provincia = ?",
+      "UPDATE precos_provincias SET diesel = $1, gasolina = $2, gas = $3 WHERE provincia = $4",
       [diesel, gasolina, gas, provincia]
     );
     res.json({ success: true, message: "Preços atualizados com sucesso." });
@@ -571,7 +515,7 @@ app.post("/api/viaturas", async (req, res) => {
   try {
     await run(
       `INSERT INTO viaturas (matricula, marca, modelo, tipo, ano, kilometragem, km_atual, capacidade, combustivel, estado, observacoes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [matricula, marca, modelo, tipo, ano, kilometragem || 0, km_atual || 0, capacidade, combustivel, estado || "Disponível", observacoes]
     );
     res.json({ success: true, message: "Viatura registada com sucesso." });
@@ -585,8 +529,7 @@ app.put("/api/viaturas/:id", async (req, res) => {
   const { matricula, marca, modelo, tipo, ano, kilometragem, km_atual, capacidade, combustivel, estado, observacoes } = req.body;
   try {
     await run(
-      `UPDATE viaturas SET matricula = ?, marca = ?, modelo = ?, tipo = ?, ano = ?, kilometragem = ?, km_atual = ?, capacidade = ?, combustivel = ?, estado = ?, observacoes = ?
-       WHERE id = ?`,
+      `UPDATE viaturas SET matricula = $1, marca = $2, modelo = $3, tipo = $4, ano = $5, kilometragem = $6, km_atual = $7, capacidade = $8, combustivel = $9, estado = $10, observacoes = $11 WHERE id = $12`,
       [matricula, marca, modelo, tipo, ano, kilometragem, km_atual, capacidade, combustivel, estado, observacoes, id]
     );
     res.json({ success: true, message: "Viatura atualizada com sucesso." });
@@ -598,7 +541,7 @@ app.put("/api/viaturas/:id", async (req, res) => {
 app.delete("/api/viaturas/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    await run("DELETE FROM viaturas WHERE id = ?", [id]);
+    await run("DELETE FROM viaturas WHERE id = $1", [id]);
     res.json({ success: true, message: "Viatura removida com sucesso." });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
@@ -618,22 +561,18 @@ app.get("/api/motoristas", async (req, res) => {
 app.post("/api/motoristas", async (req, res) => {
   const { nome, email, telefone, carta_conducao, validade_carta, ativo, categoria_carta, bi, nuit, observacoes, score } = req.body;
   try {
-    const username = nome
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]/g, "");
+    const username = nome.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
     const password = `${username}.123`;
     const hashedPassword = hashPassword(password);
 
     const userResult = await run(`
       INSERT INTO usuarios (email, senha, nome, role)
-      VALUES (?, ?, ?, 'funcionario')
+      VALUES ($1, $2, $3, 'funcionario')
     `, [username, hashedPassword, nome]);
 
     await run(
       `INSERT INTO funcionarios (nome, email, telefone, carta_conducao, validade_carta, ativo, categoria_carta, bi, nuit, observacoes, score, cargo, salario_base, data_admissao, usuario_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Motorista', 18500, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'Motorista', 18500, $12, $13)`,
       [
         nome, email, telefone, carta_conducao, validade_carta, 
         ativo !== undefined ? ativo : 1, categoria_carta, bi, nuit, observacoes, 
@@ -658,14 +597,13 @@ app.put("/api/motoristas/:id", async (req, res) => {
   const { id } = req.params;
   const { nome, email, telefone, carta_conducao, validade_carta, ativo, categoria_carta, bi, nuit, observacoes, score } = req.body;
   try {
-    const existing = await get<any>("SELECT usuario_id FROM funcionarios WHERE id = ?", [id]);
+    const existing = await get<any>("SELECT usuario_id FROM funcionarios WHERE id = $1", [id]);
     if (existing && existing.usuario_id) {
-      await run("UPDATE usuarios SET nome = ? WHERE id = ?", [nome, existing.usuario_id]);
+      await run("UPDATE usuarios SET nome = $1 WHERE id = $2", [nome, existing.usuario_id]);
     }
 
     await run(
-      `UPDATE funcionarios SET nome = ?, email = ?, telefone = ?, carta_conducao = ?, validade_carta = ?, ativo = ?, categoria_carta = ?, bi = ?, nuit = ?, observacoes = ?, score = ?
-       WHERE id = ?`,
+      `UPDATE funcionarios SET nome = $1, email = $2, telefone = $3, carta_conducao = $4, validade_carta = $5, ativo = $6, categoria_carta = $7, bi = $8, nuit = $9, observacoes = $10, score = $11 WHERE id = $12`,
       [nome, email, telefone, carta_conducao, validade_carta, ativo, categoria_carta, bi, nuit, observacoes, score, id]
     );
 
@@ -680,11 +618,11 @@ app.put("/api/motoristas/:id", async (req, res) => {
 app.delete("/api/motoristas/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    const existing = await get<any>("SELECT nome, usuario_id FROM funcionarios WHERE id = ?", [id]);
+    const existing = await get<any>("SELECT nome, usuario_id FROM funcionarios WHERE id = $1", [id]);
     if (existing && existing.usuario_id) {
-      await run("DELETE FROM usuarios WHERE id = ?", [existing.usuario_id]);
+      await run("DELETE FROM usuarios WHERE id = $1", [existing.usuario_id]);
     }
-    await run("DELETE FROM funcionarios WHERE id = ?", [id]);
+    await run("DELETE FROM funcionarios WHERE id = $1", [id]);
 
     const mName = existing ? existing.nome : `ID ${id}`;
     await logActivity(null, "Administrador/RH", "Exclusão de Motorista", `Motorista "${mName}" removido permanentemente.`);
@@ -695,7 +633,7 @@ app.delete("/api/motoristas/:id", async (req, res) => {
   }
 });
 
-// 5. Bombas (Fuel Stations)
+// 5. Bombas
 app.get("/api/bombas", async (req, res) => {
   try {
     const list = await query("SELECT * FROM bombas ORDER BY nome ASC");
@@ -710,7 +648,7 @@ app.post("/api/bombas", async (req, res) => {
   try {
     await run(
       `INSERT INTO bombas (nome, endereco, contacto, provincia, ativo, preco_diesel, preco_gasolina, preco_gas)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [nome, endereco, contacto, provincia, ativo !== undefined ? ativo : 1, preco_diesel, preco_gasolina, preco_gas]
     );
     res.json({ success: true, message: "Bomba de abastecimento registada com sucesso." });
@@ -724,8 +662,7 @@ app.put("/api/bombas/:id", async (req, res) => {
   const { nome, endereco, contacto, provincia, ativo, preco_diesel, preco_gasolina, preco_gas } = req.body;
   try {
     await run(
-      `UPDATE bombas SET nome = ?, endereco = ?, contacto = ?, provincia = ?, ativo = ?, preco_diesel = ?, preco_gasolina = ?, preco_gas = ?
-       WHERE id = ?`,
+      `UPDATE bombas SET nome = $1, endereco = $2, contacto = $3, provincia = $4, ativo = $5, preco_diesel = $6, preco_gasolina = $7, preco_gas = $8 WHERE id = $9`,
       [nome, endereco, contacto, provincia, ativo, preco_diesel, preco_gasolina, preco_gas, id]
     );
     res.json({ success: true, message: "Bomba de abastecimento atualizada com sucesso." });
@@ -737,7 +674,7 @@ app.put("/api/bombas/:id", async (req, res) => {
 app.delete("/api/bombas/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    await run("DELETE FROM bombas WHERE id = ?", [id]);
+    await run("DELETE FROM bombas WHERE id = $1", [id]);
     res.json({ success: true, message: "Bomba removida com sucesso." });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
@@ -772,14 +709,14 @@ app.get("/api/alertas", async (req, res) => {
 app.put("/api/alertas/:id/resolver", async (req, res) => {
   const { id } = req.params;
   try {
-    await run("UPDATE alertas SET resolvido = 1 WHERE id = ?", [id]);
+    await run("UPDATE alertas SET resolvido = 1 WHERE id = $1", [id]);
     res.json({ success: true, message: "Alerta resolvido com sucesso." });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-// 8. Viagens (Trips)
+// 8. Viagens
 app.get("/api/viagens", async (req, res) => {
   try {
     const list = await query(`
@@ -799,7 +736,6 @@ app.get("/api/viagens", async (req, res) => {
   }
 });
 
-// POST /api/viagens - Create a trip & auto-refuel
 app.post("/api/viagens", async (req, res) => {
   const {
     numero_viagem,
@@ -817,12 +753,12 @@ app.post("/api/viagens", async (req, res) => {
   } = req.body;
 
   try {
-    const viatura = await get<any>("SELECT * FROM viaturas WHERE id = ?", [viatura_id]);
+    const viatura = await get<any>("SELECT * FROM viaturas WHERE id = $1", [viatura_id]);
     if (!viatura) {
       return res.status(404).json({ success: false, message: "Viatura não encontrada." });
     }
 
-    const bomba = await get<any>("SELECT * FROM bombas WHERE id = ?", [bomba_id]);
+    const bomba = await get<any>("SELECT * FROM bombas WHERE id = $1", [bomba_id]);
     if (!bomba) {
       return res.status(404).json({ success: false, message: "Bomba não encontrada." });
     }
@@ -839,7 +775,7 @@ app.post("/api/viagens", async (req, res) => {
     }
 
     if (valor_unitario === 0) {
-      const provPrice = await get<any>("SELECT * FROM precos_provincias WHERE provincia = ?", [bomba.provincia]);
+      const provPrice = await get<any>("SELECT * FROM precos_provincias WHERE provincia = $1", [bomba.provincia]);
       if (provPrice) {
         if (fuelType.includes("diesel")) valor_unitario = provPrice.diesel;
         else if (fuelType.includes("gasolina")) valor_unitario = provPrice.gasolina;
@@ -858,7 +794,7 @@ app.post("/api/viagens", async (req, res) => {
         combustivel_gasto_mzn, expediente, reforcos,
         intermediacao_mzn, escolta_mzn, quebras_faltas_mzn, faturacao_mzn, total_remanescente_mzn,
         estado, observacoes
-      ) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL, NULL, 0, 0, 0, 0, 0, ?, ? )`,
+      ) VALUES ($1, $2, NULL, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NULL, NULL, $14, NULL, NULL, 0, 0, 0, 0, 0, $15, $16)`,
       [
         numero_viagem,
         data_partida,
@@ -883,7 +819,7 @@ app.post("/api/viagens", async (req, res) => {
       `INSERT INTO abastecimentos (
         viatura_id, viagem, cliente, data_abastecimento, bomba_name, provincia,
         bomba_litros, sistema_litros, diferenca, valor_combustivel, valor_unitario, observacoes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
       [
         viatura_id,
         numero_viagem,
@@ -900,7 +836,7 @@ app.post("/api/viagens", async (req, res) => {
       ]
     );
 
-    await run("UPDATE viaturas SET estado = 'Em Viagem' WHERE id = ?", [viatura_id]);
+    await run("UPDATE viaturas SET estado = 'Em Viagem' WHERE id = $1", [viatura_id]);
 
     const percentDev = litros_sistema > 0 ? (Math.abs(diferenca_litros) / litros_sistema) * 100 : 0;
     if (Math.abs(diferenca_litros) >= 5 || percentDev >= 3) {
@@ -908,7 +844,7 @@ app.post("/api/viagens", async (req, res) => {
       const severity = Math.abs(diferenca_litros) >= 20 ? "alta" : "media";
       await run(
         `INSERT INTO alertas (id, data_hora, tipo, titulo, mensagem, resolvido, gravidade, meta)
-         VALUES (?, ?, ?, ?, ?, 0, ?, ?)`,
+         VALUES ($1, $2, $3, $4, $5, 0, $6, $7)`,
          [
            alertId,
            new Date().toISOString(),
@@ -920,7 +856,7 @@ app.post("/api/viagens", async (req, res) => {
          ]
       );
 
-      await run("UPDATE motoristas SET score = MAX(0, score - 5) WHERE id = ?", [motorista_id]);
+      await run("UPDATE motoristas SET score = MAX(0, score - 5) WHERE id = $1", [motorista_id]);
     }
 
     res.json({ success: true, message: "Viagem iniciada com sucesso.", tripId: result.lastID });
@@ -929,7 +865,6 @@ app.post("/api/viagens", async (req, res) => {
   }
 });
 
-// PUT /api/viagens/:id - Edit / Close Voyage
 app.put("/api/viagens/:id", async (req, res) => {
   const { id } = req.params;
   const {
@@ -948,7 +883,7 @@ app.put("/api/viagens/:id", async (req, res) => {
   } = req.body;
 
   try {
-    const trip = await get<any>("SELECT * FROM viagens WHERE id = ?", [id]);
+    const trip = await get<any>("SELECT * FROM viagens WHERE id = $1", [id]);
     if (!trip) {
       return res.status(404).json({ success: false, message: "Viagem não encontrada." });
     }
@@ -962,19 +897,19 @@ app.put("/api/viagens/:id", async (req, res) => {
 
     await run(
       `UPDATE viagens SET
-        estado = ?,
-        data_chegada = ?,
-        intermediacao_mzn = ?,
-        escolta_mzn = ?,
-        quebras_faltas_mzn = ?,
-        faturacao_mzn = ?,
-        total_remanescente_mzn = ?,
-        observacoes = ?,
-        expediente = ?,
-        reforcos = ?,
-        p_o = ?,
-        origem_combustivel = ?
-       WHERE id = ?`,
+        estado = $1,
+        data_chegada = $2,
+        intermediacao_mzn = $3,
+        escolta_mzn = $4,
+        quebras_faltas_mzn = $5,
+        faturacao_mzn = $6,
+        total_remanescente_mzn = $7,
+        observacoes = $8,
+        expediente = $9,
+        reforcos = $10,
+        p_o = $11,
+        origem_combustivel = $12
+       WHERE id = $13`,
       [
         estado,
         data_chegada,
@@ -993,9 +928,9 @@ app.put("/api/viagens/:id", async (req, res) => {
     );
 
     if (estado === "concluida") {
-      await run("UPDATE viaturas SET estado = 'Disponível' WHERE id = ?", [trip.viatura_id]);
+      await run("UPDATE viaturas SET estado = 'Disponível' WHERE id = $1", [trip.viatura_id]);
       if (km_chegada) {
-        await run("UPDATE viaturas SET km_atual = ? WHERE id = ?", [km_chegada, trip.viatura_id]);
+        await run("UPDATE viaturas SET km_atual = $1 WHERE id = $2", [km_chegada, trip.viatura_id]);
       }
     }
 
@@ -1005,7 +940,7 @@ app.put("/api/viagens/:id", async (req, res) => {
   }
 });
 
-// 9. Funcionários (Employees) CRUD
+// 9. Funcionários (Employees) - COMPLETE CRUD
 app.get("/api/funcionarios", async (req, res) => {
   try {
     const list = await query("SELECT * FROM funcionarios ORDER BY nome ASC");
@@ -1022,11 +957,7 @@ app.post("/api/funcionarios", async (req, res) => {
     empresa_nome, empresa_nuit, empresa_localizacao 
   } = req.body;
   try {
-    const username = nome
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]/g, "");
+    const username = nome.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
     const password = `${username}.123`;
     const hashedPassword = hashPassword(password);
 
@@ -1042,7 +973,7 @@ app.post("/api/funcionarios", async (req, res) => {
 
     const userResult = await run(`
       INSERT INTO usuarios (email, senha, nome, role)
-      VALUES (?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4)
     `, [username, hashedPassword, nome, userRole]);
 
     await run(`
@@ -1051,7 +982,7 @@ app.post("/api/funcionarios", async (req, res) => {
         bi, nuit, observacoes, score, cargo, salario_base, data_admissao, usuario_id,
         empresa_nome, empresa_nuit, empresa_localizacao
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
     `, [
       nome, email, telefone,
       carta_conducao || null, validade_carta || null,
@@ -1085,7 +1016,7 @@ app.put("/api/funcionarios/:id", async (req, res) => {
     empresa_nome, empresa_nuit, empresa_localizacao 
   } = req.body;
   try {
-    const existing = await get<any>("SELECT * FROM funcionarios WHERE id = ?", [id]);
+    const existing = await get<any>("SELECT * FROM funcionarios WHERE id = $1", [id]);
     if (existing && existing.usuario_id) {
       let userRole = "funcionario";
       const cargoLower = (cargo || "").toLowerCase();
@@ -1097,14 +1028,14 @@ app.put("/api/funcionarios/:id", async (req, res) => {
         userRole = "administracao";
       }
 
-      await run("UPDATE usuarios SET nome = ?, role = ? WHERE id = ?", [nome, userRole, existing.usuario_id]);
+      await run("UPDATE usuarios SET nome = $1, role = $2 WHERE id = $3", [nome, userRole, existing.usuario_id]);
     }
 
     await run(`
       UPDATE funcionarios
-      SET nome = ?, email = ?, telefone = ?, carta_conducao = ?, validade_carta = ?, ativo = ?, categoria_carta = ?, bi = ?, nuit = ?, observacoes = ?, score = ?, cargo = ?, salario_base = ?, data_admissao = ?,
-          empresa_nome = ?, empresa_nuit = ?, empresa_localizacao = ?
-      WHERE id = ?
+      SET nome = $1, email = $2, telefone = $3, carta_conducao = $4, validade_carta = $5, ativo = $6, categoria_carta = $7, bi = $8, nuit = $9, observacoes = $10, score = $11, cargo = $12, salario_base = $13, data_admissao = $14,
+          empresa_nome = $15, empresa_nuit = $16, empresa_localizacao = $17
+      WHERE id = $18
     `, [
       nome, email, telefone, carta_conducao, validade_carta, ativo, categoria_carta, bi, nuit, observacoes, score, cargo, Number(salario_base), data_admissao,
       empresa_nome || 'RHINO CARGO, LIMITADA',
@@ -1124,11 +1055,11 @@ app.put("/api/funcionarios/:id", async (req, res) => {
 app.delete("/api/funcionarios/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    const existing = await get<any>("SELECT * FROM funcionarios WHERE id = ?", [id]);
+    const existing = await get<any>("SELECT * FROM funcionarios WHERE id = $1", [id]);
     if (existing && existing.usuario_id) {
-      await run("DELETE FROM usuarios WHERE id = ?", [existing.usuario_id]);
+      await run("DELETE FROM usuarios WHERE id = $1", [existing.usuario_id]);
     }
-    await run("DELETE FROM funcionarios WHERE id = ?", [id]);
+    await run("DELETE FROM funcionarios WHERE id = $1", [id]);
 
     const fName = existing ? existing.nome : `ID ${id}`;
     await logActivity(null, "Administrador/RH", "Exclusão de Funcionário", `Funcionário "${fName}" removido permanentemente do sistema.`);
@@ -1160,7 +1091,7 @@ app.post("/api/despesas_gerais", async (req, res) => {
   try {
     await run(`
       INSERT INTO despesas_gerais (descricao, categoria, valor, data_despesa, funcionario_id, viatura_id, estado, observacoes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     `, [descricao, categoria, Number(valor), data_despesa, funcionario_id || null, viatura_id || null, estado || 'Pago', observacoes]);
     res.json({ success: true, message: "Despesa registada com sucesso." });
   } catch (error: any) {
@@ -1174,8 +1105,8 @@ app.put("/api/despesas_gerais/:id", async (req, res) => {
   try {
     await run(`
       UPDATE despesas_gerais
-      SET descricao = ?, categoria = ?, valor = ?, data_despesa = ?, funcionario_id = ?, viatura_id = ?, estado = ?, observacoes = ?
-      WHERE id = ?
+      SET descricao = $1, categoria = $2, valor = $3, data_despesa = $4, funcionario_id = $5, viatura_id = $6, estado = $7, observacoes = $8
+      WHERE id = $9
     `, [descricao, categoria, Number(valor), data_despesa, funcionario_id || null, viatura_id || null, estado, observacoes, id]);
     res.json({ success: true, message: "Despesa atualizada com sucesso." });
   } catch (error: any) {
@@ -1186,7 +1117,7 @@ app.put("/api/despesas_gerais/:id", async (req, res) => {
 app.delete("/api/despesas_gerais/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    await run("DELETE FROM despesas_gerais WHERE id = ?", [id]);
+    await run("DELETE FROM despesas_gerais WHERE id = $1", [id]);
     res.json({ success: true, message: "Despesa removida com sucesso." });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
@@ -1213,7 +1144,7 @@ app.post("/api/pedidos_rh", async (req, res) => {
   try {
     await run(`
       INSERT INTO pedidos_rh (funcionario_id, tipo, data_inicio, data_fim, dias, motivo, estado, data_pedido, observacoes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     `, [
       funcionario_id, tipo, data_inicio, data_fim, Number(dias), motivo,
       estado || 'Pendente', new Date().toISOString().split("T")[0], observacoes
@@ -1228,7 +1159,7 @@ app.put("/api/pedidos_rh/:id", async (req, res) => {
   const { id } = req.params;
   const { estado, observacoes } = req.body;
   try {
-    await run("UPDATE pedidos_rh SET estado = ?, observacoes = ? WHERE id = ?", [estado, observacoes, id]);
+    await run("UPDATE pedidos_rh SET estado = $1, observacoes = $2 WHERE id = $3", [estado, observacoes, id]);
     res.json({ success: true, message: "Pedido de RH atualizado com sucesso." });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
@@ -1238,7 +1169,7 @@ app.put("/api/pedidos_rh/:id", async (req, res) => {
 app.delete("/api/pedidos_rh/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    await run("DELETE FROM pedidos_rh WHERE id = ?", [id]);
+    await run("DELETE FROM pedidos_rh WHERE id = $1", [id]);
     res.json({ success: true, message: "Pedido removido com sucesso." });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
@@ -1294,7 +1225,7 @@ app.post("/api/recibos_salarios", async (req, res) => {
         salario_liquido, data_emissao, estado, observacoes,
         faltas, subsidios, horas_extras, inss, irps
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
     `, [
       funcionario_id, mes_ano, s_base, s_bonus, s_desc, 
       s_liq, new Date().toISOString().split("T")[0], estado || 'Pago', observacoes,
@@ -1336,20 +1267,20 @@ app.put("/api/recibos_salarios/:id", async (req, res) => {
 
     await run(`
       UPDATE recibos_salarios 
-      SET funcionario_id = ?, 
-          mes_ano = ?, 
-          salario_base = ?, 
-          bonus = ?, 
-          descontos = ?, 
-          salario_liquido = ?, 
-          estado = ?, 
-          observacoes = ?,
-          faltas = ?, 
-          subsidios = ?, 
-          horas_extras = ?, 
-          inss = ?, 
-          irps = ?
-      WHERE id = ?
+      SET funcionario_id = $1, 
+          mes_ano = $2, 
+          salario_base = $3, 
+          bonus = $4, 
+          descontos = $5, 
+          salario_liquido = $6, 
+          estado = $7, 
+          observacoes = $8,
+          faltas = $9, 
+          subsidios = $10, 
+          horas_extras = $11, 
+          inss = $12, 
+          irps = $13
+      WHERE id = $14
     `, [
       funcionario_id, mes_ano, s_base, s_bonus, s_desc, 
       s_liq, estado, observacoes,
@@ -1364,14 +1295,14 @@ app.put("/api/recibos_salarios/:id", async (req, res) => {
 app.delete("/api/recibos_salarios/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    await run("DELETE FROM recibos_salarios WHERE id = ?", [id]);
+    await run("DELETE FROM recibos_salarios WHERE id = $1", [id]);
     res.json({ success: true, message: "Recibo de salário removido com sucesso." });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-// 13. Performance Statistics Dashboard Data
+// 13. Performance
 app.get("/api/performance", async (req, res) => {
   try {
     const totalV = await get<{ count: number }>("SELECT COUNT(*) as count FROM viaturas");
@@ -1441,7 +1372,7 @@ app.get("/api/performance", async (req, res) => {
   }
 });
 
-// 14. System Audit Log
+// 14. Audit Logs
 app.get("/api/auditoria_logs", async (req, res) => {
   try {
     const logs = await query("SELECT * FROM auditoria_logs ORDER BY id DESC LIMIT 500");
@@ -1461,8 +1392,7 @@ app.post("/api/auditoria_logs/clear", async (req, res) => {
   }
 });
 
-// ---------------- VITE MIDDLEWARE CONFIG ----------------
-
+// ---------------- VITE MIDDLEWARE ----------------
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
