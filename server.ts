@@ -448,23 +448,20 @@ async function initializeDatabase() {
 
 // ---------------- REST API ROUTES (COMPLETE WITH ::text FIX) ----------------
 
-// 1. Authentication - CORRIGIDO para PostgreSQL
 app.post("/api/auth/login", async (req, res) => {
   const { email, senha } = req.body;
   if (!email || !senha) {
     return res.status(400).json({ success: false, message: "Email ou Usuário e senha são obrigatórios." });
   }
   try {
-    // 🔧 FIX: Usa ::text para converter o parâmetro para texto
     const user = await get<any>(
       "SELECT id, email, nome, role, senha FROM usuarios WHERE email = $1::text OR nome = $1::text", 
       [String(email)]
     );
     if (user && verifyPassword(senha, user.senha)) {
-      // 🔧 FIX: Usa ::text nas comparações de texto
       const emp = await get<any>(
-        "SELECT id, cargo, score FROM funcionarios WHERE usuario_id = $1 OR email = $1::text OR nome = $1::text", 
-        [user.id, user.email, user.nome]
+        "SELECT id, cargo, score FROM funcionarios WHERE usuario_id = $1", 
+        [user.id]
       );
       delete user.senha;
       const enrichedUser = {
