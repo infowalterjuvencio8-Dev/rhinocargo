@@ -2,7 +2,11 @@ import React, { useState } from "react";
 import { motion } from "motion/react";
 import { Shield, Lock, Mail, Truck } from "lucide-react";
 import { Usuario } from "../types";
+<<<<<<< HEAD
 import logoImg from "./logo.png";
+=======
+import logoImg from "./Logo.svg";
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
 
 interface LoginProps {
   onLoginSuccess: (user: Usuario) => void;

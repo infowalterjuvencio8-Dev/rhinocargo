@@ -5,7 +5,11 @@ import {
   X, UserCheck, UserX, Star, Phone, Mail, Award, FileSpreadsheet 
 } from "lucide-react";
 import { Motorista, Viagem, Usuario } from "../types";
+<<<<<<< HEAD
 import logoImg from "./logo.png";
+=======
+import logoImg from "./Logo.svg";
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
 
 interface MotoristasProps {
   motoristas: Motorista[];
@@ -641,6 +645,7 @@ export default function Motoristas({ motoristas, viagens, currentUser, onRefresh
               <div className="p-8 space-y-6 bg-slate-950 text-slate-100 max-h-[75vh] overflow-y-auto print-card" id="printable-driver-profile">
                 
                 {/* Company Logo Header for Print */}
+<<<<<<< HEAD
                 <div className="flex justify-between items-start border-b border-slate-800 pb-4 mb-4 print:bg-[#F0F2FA] print:p-4 print:rounded-lg print:border-b-2 print:border-[#283B91] print:text-slate-900">
                   <div className="flex items-start gap-4">
                     <div className="w-20 h-10 max-h-10 flex items-center justify-center overflow-hidden shrink-0">
@@ -661,6 +666,18 @@ export default function Motoristas({ motoristas, viagens, currentUser, onRefresh
                     <div className="text-[9px] text-slate-500 print:text-slate-700">
                       Emitido: <span className="font-mono print:text-slate-900">{new Date().toLocaleDateString("pt-MZ")}</span>
                     </div>
+=======
+                <div className="flex justify-between items-center border-b border-slate-800 pb-4 mb-4">
+                  <div className="flex items-center gap-2.5">
+                    <img src={logoImg} className="h-9 w-auto object-contain print:h-9" alt="RHINO CARGO" />
+                    <div>
+                      <span className="text-sm font-black text-white print:text-slate-900 uppercase tracking-wider">RHINO CARGO LDA</span>
+                      <p className="text-[9px] text-slate-500 font-mono">Ficha de Registo do Motorista</p>
+                    </div>
+                  </div>
+                  <div className="text-right text-[10px] text-slate-500">
+                    Emitido em: <span className="font-mono">{new Date().toLocaleDateString("pt-MZ")}</span>
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
                   </div>
                 </div>
 

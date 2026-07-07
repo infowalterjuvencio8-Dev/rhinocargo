@@ -5,9 +5,15 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   
+<<<<<<< HEAD
   --color-rhino-blue: #283B91;
   --color-rhino-pink: #EA088C;
   --color-rhino-green: #38B44A;
+=======
+  --color-rhino-blue: #2E4399;
+  --color-rhino-pink: #E9008C;
+  --color-rhino-green: #32B64A;
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
   --color-rhino-dark: #070913;
   --color-rhino-card: #0F1329;
   --color-rhino-muted: #1A2142;

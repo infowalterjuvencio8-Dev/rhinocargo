@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import path from "path";
+<<<<<<< HEAD
 import sqlite3 from "sqlite3";
 import mysql from "mysql2/promise";
 import { createServer as createViteServer } from "vite";
@@ -68,6 +69,44 @@ async function connectDatabase() {
         console.log("[Database] Connected to SQLite fallback database successfully.");
       }
     });
+=======
+import { Pool } from "pg";
+import { createServer as createViteServer } from "vite";
+import crypto from "crypto";
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(express.json());
+
+// Database configuration using DATABASE_URL from Render
+const DATABASE_URL = process.env.DATABASE_URL;
+
+let pool: Pool | null = null;
+
+async function connectDatabase() {
+  if (!DATABASE_URL) {
+    console.error("[Database] DATABASE_URL environment variable is not set!");
+    console.error("[Database] Please set DATABASE_URL in your Render environment variables.");
+    process.exit(1);
+  }
+
+  try {
+    console.log("[Database] Attempting to connect to PostgreSQL...");
+    
+    pool = new Pool({
+      connectionString: DATABASE_URL,
+      ssl: {
+        rejectUnauthorized: false
+      }
+    });
+
+    await pool.query('SELECT NOW()');
+    console.log("[Database] Successfully connected to PostgreSQL on Render!");
+  } catch (err: any) {
+    console.error(`[Database] PostgreSQL connection failed: ${err.message}`);
+    process.exit(1);
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
   }
 }
 
@@ -93,13 +132,18 @@ async function logActivity(usuario_id: number | null, usuario_nome: string, acao
   try {
     await run(`
       INSERT INTO auditoria_logs (usuario_id, usuario_nome, acao, detalhes, data_hora, ip_address)
+<<<<<<< HEAD
       VALUES (?, ?, ?, ?, ?, ?)
+=======
+      VALUES ($1, $2, $3, $4, $5, $6)
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     `, [usuario_id, usuario_nome, acao, detalhes, new Date().toISOString(), ip]);
   } catch (err) {
     console.error("Failed to insert audit log:", err);
   }
 }
 
+<<<<<<< HEAD
 // Promisified Query Helpers supporting BOTH MySQL and SQLite
 function query<T>(sql: string, params: any[] = []): Promise<T[]> {
   if (dbType === "mysql" && mysqlPool) {
@@ -149,11 +193,34 @@ function get<T>(sql: string, params: any[] = []): Promise<T | undefined> {
       });
     });
   }
+=======
+// Promisified Query Helpers for PostgreSQL
+async function query<T>(sql: string, params: any[] = []): Promise<T[]> {
+  if (!pool) throw new Error("Database not connected");
+  const result = await pool.query(sql, params);
+  return result.rows as T[];
+}
+
+async function run(sql: string, params: any[] = []): Promise<{ lastID: number; changes: number }> {
+  if (!pool) throw new Error("Database not connected");
+  const result = await pool.query(sql, params);
+  return {
+    lastID: (result as any).rows?.[0]?.id || 0,
+    changes: (result as any).rowCount || 0
+  };
+}
+
+async function get<T>(sql: string, params: any[] = []): Promise<T | undefined> {
+  if (!pool) throw new Error("Database not connected");
+  const result = await pool.query(sql, params);
+  return result.rows.length > 0 ? result.rows[0] as T : undefined;
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
 }
 
 // Database Initialization and Seeding
 async function initializeDatabase() {
   try {
+<<<<<<< HEAD
     if (dbType === "mysql") {
       console.log("[Database] Constructing MySQL Schema...");
 
@@ -617,6 +684,221 @@ async function initializeDatabase() {
     const provinceCountResult = await get<any>("SELECT COUNT(*) as count FROM precos_provincias");
     const provinceCount = provinceCountResult?.count !== undefined ? provinceCountResult.count : (provinceCountResult ? Object.values(provinceCountResult)[0] : 0);
     if (Number(provinceCount) === 0) {
+=======
+    console.log("[Database] Constructing PostgreSQL Schema...");
+
+    await run(`
+      CREATE TABLE IF NOT EXISTS precos_provincias (
+        provincia VARCHAR(100) PRIMARY KEY,
+        diesel DOUBLE PRECISION NOT NULL,
+        gasolina DOUBLE PRECISION NOT NULL,
+        gas DOUBLE PRECISION NOT NULL
+      )
+    `);
+
+    await run(`
+      CREATE TABLE IF NOT EXISTS usuarios (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        senha VARCHAR(255) NOT NULL,
+        nome VARCHAR(255) NOT NULL,
+        role VARCHAR(50) NOT NULL
+      )
+    `);
+
+    await run(`
+      CREATE TABLE IF NOT EXISTS funcionarios (
+        id SERIAL PRIMARY KEY,
+        nome VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        telefone VARCHAR(50) NOT NULL,
+        carta_conducao VARCHAR(100),
+        validade_carta VARCHAR(50),
+        ativo INT NOT NULL DEFAULT 1,
+        categoria_carta VARCHAR(50),
+        bi VARCHAR(50) NOT NULL,
+        nuit VARCHAR(50) NOT NULL,
+        observacoes TEXT,
+        score INT NOT NULL DEFAULT 100,
+        cargo VARCHAR(100) NOT NULL DEFAULT 'Motorista',
+        salario_base DOUBLE PRECISION NOT NULL DEFAULT 15000,
+        data_admissao VARCHAR(50),
+        usuario_id INT,
+        empresa_nome VARCHAR(255) DEFAULT 'RHINO CARGO, LIMITADA',
+        empresa_nuit VARCHAR(50) DEFAULT '400582914',
+        empresa_localizacao VARCHAR(500) DEFAULT 'Porto de Maputo, Recinto Portuário, Maputo, Moçambique'
+      )
+    `);
+
+    await run("DROP VIEW IF EXISTS motoristas");
+    await run(`
+      CREATE VIEW motoristas AS 
+      SELECT id, nome, email, telefone, carta_conducao, validade_carta, ativo, categoria_carta, bi, nuit, observacoes, score 
+      FROM funcionarios 
+      WHERE cargo = 'Motorista' OR cargo = 'motorista'
+    `);
+
+    await run(`
+      CREATE TABLE IF NOT EXISTS bombas (
+        id SERIAL PRIMARY KEY,
+        nome VARCHAR(255) NOT NULL,
+        endereco VARCHAR(500) NOT NULL,
+        contacto VARCHAR(100) NOT NULL,
+        provincia VARCHAR(100) NOT NULL,
+        ativo INT NOT NULL DEFAULT 1,
+        preco_diesel DOUBLE PRECISION,
+        preco_gasolina DOUBLE PRECISION,
+        preco_gas DOUBLE PRECISION
+      )
+    `);
+
+    await run(`
+      CREATE TABLE IF NOT EXISTS viaturas (
+        id SERIAL PRIMARY KEY,
+        matricula VARCHAR(50) UNIQUE NOT NULL,
+        marca VARCHAR(100) NOT NULL,
+        modelo VARCHAR(100) NOT NULL,
+        tipo VARCHAR(100) NOT NULL,
+        ano INT NOT NULL,
+        kilometragem DOUBLE PRECISION NOT NULL,
+        km_atual DOUBLE PRECISION NOT NULL,
+        capacidade DOUBLE PRECISION NOT NULL,
+        combustivel VARCHAR(50) NOT NULL,
+        estado VARCHAR(50) NOT NULL,
+        observacoes TEXT
+      )
+    `);
+
+    await run(`
+      CREATE TABLE IF NOT EXISTS viagens (
+        id SERIAL PRIMARY KEY,
+        numero_viagem VARCHAR(100) UNIQUE NOT NULL,
+        data_partida VARCHAR(50) NOT NULL,
+        data_chegada VARCHAR(50),
+        viatura_id INT NOT NULL,
+        motorista_id INT NOT NULL,
+        bomba_id INT,
+        litros_bomba DOUBLE PRECISION NOT NULL,
+        litros_sistema DOUBLE PRECISION NOT NULL,
+        diferenca_litros DOUBLE PRECISION NOT NULL,
+        total_combustivel_mzn DOUBLE PRECISION NOT NULL,
+        cliente VARCHAR(255) NOT NULL,
+        produto VARCHAR(255) NOT NULL,
+        origem VARCHAR(255) NOT NULL,
+        destino VARCHAR(255) NOT NULL,
+        p_o VARCHAR(255),
+        origem_combustivel VARCHAR(255),
+        combustivel_gasto_mzn DOUBLE PRECISION NOT NULL,
+        expediente VARCHAR(255),
+        reforcos TEXT,
+        intermediacao_mzn DOUBLE PRECISION NOT NULL,
+        escolta_mzn DOUBLE PRECISION NOT NULL,
+        quebras_faltas_mzn DOUBLE PRECISION NOT NULL,
+        faturacao_mzn DOUBLE PRECISION NOT NULL,
+        total_remanescente_mzn DOUBLE PRECISION NOT NULL,
+        estado VARCHAR(50) NOT NULL,
+        observacoes TEXT
+      )
+    `);
+
+    await run(`
+      CREATE TABLE IF NOT EXISTS abastecimentos (
+        id SERIAL PRIMARY KEY,
+        viatura_id INT NOT NULL,
+        viagem VARCHAR(100),
+        cliente VARCHAR(255),
+        data_abastecimento VARCHAR(50) NOT NULL,
+        bomba_name VARCHAR(255) NOT NULL,
+        provincia VARCHAR(100) NOT NULL,
+        bomba_litros DOUBLE PRECISION NOT NULL,
+        sistema_litros DOUBLE PRECISION NOT NULL,
+        diferenca DOUBLE PRECISION NOT NULL,
+        valor_combustivel DOUBLE PRECISION NOT NULL,
+        valor_unitario DOUBLE PRECISION NOT NULL,
+        observacoes TEXT
+      )
+    `);
+
+    await run(`
+      CREATE TABLE IF NOT EXISTS alertas (
+        id VARCHAR(100) PRIMARY KEY,
+        data_hora VARCHAR(50) NOT NULL,
+        tipo VARCHAR(100) NOT NULL,
+        titulo VARCHAR(255) NOT NULL,
+        mensagem TEXT NOT NULL,
+        resolvido INT NOT NULL DEFAULT 0,
+        gravidade VARCHAR(50) NOT NULL,
+        meta TEXT
+      )
+    `);
+
+    await run(`
+      CREATE TABLE IF NOT EXISTS despesas_gerais (
+        id SERIAL PRIMARY KEY,
+        descricao VARCHAR(255) NOT NULL,
+        categoria VARCHAR(100) NOT NULL,
+        valor DOUBLE PRECISION NOT NULL,
+        data_despesa VARCHAR(50) NOT NULL,
+        funcionario_id INT,
+        viatura_id INT,
+        estado VARCHAR(50) NOT NULL DEFAULT 'Pago',
+        observacoes TEXT
+      )
+    `);
+
+    await run(`
+      CREATE TABLE IF NOT EXISTS pedidos_rh (
+        id SERIAL PRIMARY KEY,
+        funcionario_id INT NOT NULL,
+        tipo VARCHAR(100) NOT NULL,
+        data_inicio VARCHAR(50) NOT NULL,
+        data_fim VARCHAR(50) NOT NULL,
+        dias INT NOT NULL,
+        motivo TEXT,
+        estado VARCHAR(50) NOT NULL DEFAULT 'Pendente',
+        data_pedido VARCHAR(50) NOT NULL,
+        observacoes TEXT
+      )
+    `);
+
+    await run(`
+      CREATE TABLE IF NOT EXISTS recibos_salarios (
+        id SERIAL PRIMARY KEY,
+        funcionario_id INT NOT NULL,
+        mes_ano VARCHAR(50) NOT NULL,
+        salario_base DOUBLE PRECISION NOT NULL,
+        bonus DOUBLE PRECISION NOT NULL DEFAULT 0,
+        descontos DOUBLE PRECISION NOT NULL DEFAULT 0,
+        salario_liquido DOUBLE PRECISION NOT NULL,
+        data_emissao VARCHAR(50) NOT NULL,
+        estado VARCHAR(50) NOT NULL DEFAULT 'Pago',
+        observacoes TEXT,
+        faltas DOUBLE PRECISION NOT NULL DEFAULT 0,
+        subsidios DOUBLE PRECISION NOT NULL DEFAULT 0,
+        horas_extras DOUBLE PRECISION NOT NULL DEFAULT 0,
+        inss DOUBLE PRECISION NOT NULL DEFAULT 0,
+        irps DOUBLE PRECISION NOT NULL DEFAULT 0
+      )
+    `);
+
+    await run(`
+      CREATE TABLE IF NOT EXISTS auditoria_logs (
+        id SERIAL PRIMARY KEY,
+        usuario_id INT,
+        usuario_nome VARCHAR(255) NOT NULL,
+        acao VARCHAR(255) NOT NULL,
+        detalhes TEXT NOT NULL,
+        data_hora VARCHAR(50) NOT NULL,
+        ip_address VARCHAR(100)
+      )
+    `);
+
+    console.log("[Database] Database schema validated/created successfully.");
+
+    // Seed data
+    const provinceCountResult = await get<any>("SELECT COUNT(*) as count FROM precos_provincias");
+    if (Number(provinceCountResult?.count || 0) === 0) {
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
       console.log("[Database] Seeding initial province prices...");
       const provinces = [
         ["Cabo Delgado", 93.1, 87.8, 92.5],
@@ -633,6 +915,7 @@ async function initializeDatabase() {
         ["Zambézia", 92.5, 87.2, 91.7]
       ];
       for (const p of provinces) {
+<<<<<<< HEAD
         await run("INSERT INTO precos_provincias (provincia, diesel, gasolina, gas) VALUES (?, ?, ?, ?)", p);
       }
     }
@@ -669,6 +952,23 @@ async function initializeDatabase() {
     const funcCountResult = await get<any>("SELECT COUNT(*) as count FROM funcionarios");
     const funcCount = funcCountResult?.count !== undefined ? funcCountResult.count : (funcCountResult ? Object.values(funcCountResult)[0] : 0);
     if (Number(funcCount) === 0) {
+=======
+        await run("INSERT INTO precos_provincias (provincia, diesel, gasolina, gas) VALUES ($1, $2, $3, $4)", p);
+      }
+    }
+
+    const userCountResult = await get<any>("SELECT COUNT(*) as count FROM usuarios");
+    if (Number(userCountResult?.count || 0) === 0) {
+      console.log("[Database] Seeding administrative users...");
+      await run("INSERT INTO usuarios (id, email, senha, nome, role) VALUES (1, 'walter', $1, 'Walter Juvencio Chauchau', 'admin')", [hashPassword("walter.123")]);
+      await run("INSERT INTO usuarios (id, email, senha, nome, role) VALUES (2, 'salvador', $1, 'Salvador Matlombe', 'admin')", [hashPassword("salvador.123")]);
+      await run("INSERT INTO usuarios (id, email, senha, nome, role) VALUES (3, 'clara', $1, 'Clara Tolvela', 'administracao')", [hashPassword("clara.123")]);
+      await run("INSERT INTO usuarios (id, email, senha, nome, role) VALUES (4, 'nilda', $1, 'Nilda Magumane', 'rh')", [hashPassword("nilda.123")]);
+    }
+
+    const funcCountResult = await get<any>("SELECT COUNT(*) as count FROM funcionarios");
+    if (Number(funcCountResult?.count || 0) === 0) {
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
       console.log("[Database] Seeding initial staff & official drivers...");
       await run(`
         INSERT INTO funcionarios (id, nome, email, telefone, ativo, bi, nuit, observacoes, score, cargo, salario_base, data_admissao, usuario_id)
@@ -686,8 +986,11 @@ async function initializeDatabase() {
         INSERT INTO funcionarios (id, nome, email, telefone, ativo, bi, nuit, observacoes, score, cargo, salario_base, data_admissao, usuario_id)
         VALUES (13, 'Nilda Magumane', 'nilda@gmail.com', '+258 82 555 1234', 1, '1234567890', '555444333', 'Diretora de Recursos Humanos', 100, 'Recursos Humanos', 25000, '2024-02-10', 4)
       `);
+<<<<<<< HEAD
 
       // Seeding drivers extracted from identification documents
+=======
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
       await run(`
         INSERT INTO funcionarios (id, nome, email, telefone, ativo, bi, nuit, observacoes, score, cargo, salario_base, data_admissao, carta_conducao, validade_carta, categoria_carta)
         VALUES (14, 'Hélio Salomão Machava', 'helio.machava@rhinocargo.co.mz', '+258 84 100 2001', 1, '110143498V', '110143498', 'Motorista de Rota Nacional (Carta Temporária)', 100, 'Motorista', 18500, '2024-04-10', '110143498V', '2028-12-31', 'CE')
@@ -710,10 +1013,15 @@ async function initializeDatabase() {
       `);
     }
 
+<<<<<<< HEAD
     // 5. Seed bombas
     const bombaCountResult = await get<any>("SELECT COUNT(*) as count FROM bombas");
     const bombaCount = bombaCountResult?.count !== undefined ? bombaCountResult.count : (bombaCountResult ? Object.values(bombaCountResult)[0] : 0);
     if (Number(bombaCount) === 0) {
+=======
+    const bombaCountResult = await get<any>("SELECT COUNT(*) as count FROM bombas");
+    if (Number(bombaCountResult?.count || 0) === 0) {
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
       console.log("[Database] Seeding official gas stations...");
       const pumps = [
         [1, "Bomba Petromoc - Av. 24 de Julho", "Av. 24 de Julho, Maputo Cidade", "+258 84 123 4567", "Maputo Cidade", 1, 116.25, 93.69, 90.0],
@@ -723,8 +1031,11 @@ async function initializeDatabase() {
         [5, "Bomba Petromoc - Tete Centro", "Av. da Independência, Tete", "+258 86 444 8888", "Tete", 1, 121.64, 99.08, 92.0],
         [6, "Bomba TotalEnergies - Chokwé", "Av. Principal, Chokwé", "+258 87 333 1111", "Gaza", 1, 116.25, 93.69, 91.2],
         [7, "Bomba Engen - Maxixe Centro", "EN1, Maxixe", "+258 84 222 9999", "Inhambane", 1, 116.25, 93.69, 91.5],
+<<<<<<< HEAD
 
         // Som Petroleum & Capital Oil in Base Regions
+=======
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
         [8, "Som Petroleum - Maputo Cidade", "Av. de Angola, Maputo", "+258 84 100 1101", "Maputo Cidade", 1, 116.25, 93.69, 90.0],
         [9, "Capital Oil - Maputo Cidade", "Av. das Indústrias, Maputo", "+258 84 100 1102", "Maputo Cidade", 1, 116.25, 93.69, 90.0],
         [10, "Som Petroleum - Matola", "Av. União Moçambicana, Matola", "+258 84 100 1103", "Maputo Província", 1, 116.25, 93.69, 90.0],
@@ -735,6 +1046,7 @@ async function initializeDatabase() {
         [15, "Capital Oil - Nacala", "Av. Principal do Porto, Nacala", "+258 84 100 1108", "Nampula", 1, 116.25, 93.69, 91.8],
         [16, "Som Petroleum - Pemba", "Av. Marginal, Pemba", "+258 84 100 1109", "Cabo Delgado", 1, 116.25, 93.69, 92.5],
         [17, "Capital Oil - Pemba", "Bairro Natite, Pemba", "+258 84 100 1110", "Cabo Delgado", 1, 116.25, 93.69, 92.5],
+<<<<<<< HEAD
 
         // Niassa
         [18, "Som Petroleum - Lichinga", "Av. do Trabalho, Lichinga", "+258 84 100 1111", "Niassa", 1, 123.27, 100.71, 93.0],
@@ -761,6 +1073,20 @@ async function initializeDatabase() {
         [29, "Capital Oil - Zumbo", "Estrada de Acesso Zumbo, Zumbo", "+258 84 100 1122", "Tete", 1, 0.0, 101.67, 92.0],
 
         // Key refueling points for Rhino Cargo (Machava, Marracuene, Inhope, Nampula)
+=======
+        [18, "Som Petroleum - Lichinga", "Av. do Trabalho, Lichinga", "+258 84 100 1111", "Niassa", 1, 123.27, 100.71, 93.0],
+        [19, "Capital Oil - Lichinga", "Av. de Moçambique, Lichinga", "+258 84 100 1112", "Niassa", 1, 123.27, 100.71, 93.0],
+        [20, "Som Petroleum - Tete", "Av. 25 de Junho, Tete", "+258 84 100 1113", "Tete", 1, 121.64, 99.08, 92.0],
+        [21, "Capital Oil - Tete", "Estrada Nacional EN103, Tete", "+258 84 100 1114", "Tete", 1, 121.64, 99.08, 92.0],
+        [22, "Som Petroleum - Quelimane", "Av. Julius Nyerere, Quelimane", "+258 84 100 1115", "Zambézia", 1, 120.70, 98.14, 91.7],
+        [23, "Capital Oil - Quelimane", "Av. Marginal de Quelimane, Quelimane", "+258 84 100 1116", "Zambézia", 1, 120.70, 98.14, 91.7],
+        [24, "Som Petroleum - Mueda", "Estrada de Mueda, Mueda", "+258 84 100 1117", "Cabo Delgado", 1, 131.85, 0.0, 92.5],
+        [25, "Capital Oil - Palma", "Zona de Desenvolvimento, Palma", "+258 84 100 1118", "Cabo Delgado", 1, 131.85, 0.0, 92.5],
+        [26, "Som Petroleum - Mecula", "Estrada Principal EN14, Mecula", "+258 84 100 1119", "Niassa", 1, 126.27, 0.0, 93.0],
+        [27, "Capital Oil - Mecula", "Centro Comercial Mecula, Mecula", "+258 84 100 1120", "Niassa", 1, 126.27, 0.0, 93.0],
+        [28, "Som Petroleum - Zumbo", "Bairro Fluvial, Zumbo", "+258 84 100 1121", "Tete", 1, 0.0, 101.67, 92.0],
+        [29, "Capital Oil - Zumbo", "Estrada de Acesso Zumbo, Zumbo", "+258 84 100 1122", "Tete", 1, 0.0, 101.67, 92.0],
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
         [30, "Som Petroleum - Machava", "Cruzamento da Machava, Matola", "+258 84 100 1123", "Maputo Província", 1, 116.25, 93.69, 90.0],
         [31, "Capital Oil - Machava", "Av. das Indústrias, Machava, Matola", "+258 84 100 1124", "Maputo Província", 1, 116.25, 93.69, 90.0],
         [32, "Som Petroleum - Marracuene", "Estrada Nacional EN1, Marracuene", "+258 84 100 1125", "Maputo Província", 1, 116.25, 93.69, 90.0],
@@ -771,7 +1097,21 @@ async function initializeDatabase() {
         [37, "Capital Oil - Nampula", "Rota Principal Nacala-Nampula, Nampula", "+258 84 100 1130", "Nampula", 1, 116.25, 93.69, 91.8]
       ];
       for (const p of pumps) {
+<<<<<<< HEAD
         await run("INSERT INTO bombas (id, nome, endereco, contacto, provincia, ativo, preco_diesel, preco_gasolina, preco_gas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", p);
+=======
+        await run("INSERT INTO bombas (id, nome, endereco, contacto, provincia, ativo, preco_diesel, preco_gasolina, preco_gas) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)", p);
+      }
+    }
+
+    // Hash passwords
+    const allUsers = await query<any>("SELECT id, senha, nome FROM usuarios");
+    for (const u of allUsers) {
+      if (u.senha && !u.senha.includes(":")) {
+        const hashed = hashPassword(u.senha);
+        await run("UPDATE usuarios SET senha = $1 WHERE id = $2", [hashed, u.id]);
+        console.log(`[Security] Hashed plain-text password for user "${u.nome}".`);
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
       }
     }
 
@@ -781,21 +1121,31 @@ async function initializeDatabase() {
   }
 }
 
+<<<<<<< HEAD
 // Kick off Database setup synchronously
+=======
+// Kick off Database setup
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
 (async () => {
   await connectDatabase();
   await initializeDatabase();
 })();
 
+<<<<<<< HEAD
 // ---------------- REST API ROUTES ----------------
 
 // 1. Authentication
+=======
+// ---------------- REST API ROUTES (COMPLETE WITH ::text FIX) ----------------
+
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
 app.post("/api/auth/login", async (req, res) => {
   const { email, senha } = req.body;
   if (!email || !senha) {
     return res.status(400).json({ success: false, message: "Email ou Usuário e senha são obrigatórios." });
   }
   try {
+<<<<<<< HEAD
     const user = await get<any>("SELECT id, email, nome, role, senha FROM usuarios WHERE email = ? OR nome = ?", [email, email]);
     if (user && verifyPassword(senha, user.senha)) {
       // Find linked employee profile
@@ -804,12 +1154,25 @@ app.post("/api/auth/login", async (req, res) => {
       // Remove sensitive password from response object
       delete user.senha;
 
+=======
+    const user = await get<any>(
+      "SELECT id, email, nome, role, senha FROM usuarios WHERE email = $1::text OR nome = $1::text", 
+      [String(email)]
+    );
+    if (user && verifyPassword(senha, user.senha)) {
+      const emp = await get<any>(
+        "SELECT id, cargo, score FROM funcionarios WHERE usuario_id = $1", 
+        [user.id]
+      );
+      delete user.senha;
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
       const enrichedUser = {
         ...user,
         funcionario_id: emp ? emp.id : null,
         cargo: emp ? emp.cargo : null,
         score: emp ? emp.score : 100
       };
+<<<<<<< HEAD
 
       // Audit Log for successful login
       await logActivity(user.id, user.nome, "Autenticação", "Sessão iniciada no sistema com sucesso.");
@@ -817,10 +1180,19 @@ app.post("/api/auth/login", async (req, res) => {
       res.json({ success: true, user: enrichedUser });
     } else {
       // Audit failure attempt
+=======
+      await logActivity(user.id, user.nome, "Autenticação", "Sessão iniciada no sistema com sucesso.");
+      res.json({ success: true, user: enrichedUser });
+    } else {
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
       await logActivity(null, "Convidado", "Falha de Autenticação", `Tentativa fracassada de login para o usuário: ${email}`);
       res.status(401).json({ success: false, message: "Credenciais inválidas." });
     }
   } catch (error: any) {
+<<<<<<< HEAD
+=======
+    console.error("[Login Error]", error);
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -840,7 +1212,11 @@ app.put("/api/precos_provincias/:provincia", async (req, res) => {
   const { diesel, gasolina, gas } = req.body;
   try {
     await run(
+<<<<<<< HEAD
       "UPDATE precos_provincias SET diesel = ?, gasolina = ?, gas = ? WHERE provincia = ?",
+=======
+      "UPDATE precos_provincias SET diesel = $1, gasolina = $2, gas = $3 WHERE provincia = $4::text",
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
       [diesel, gasolina, gas, provincia]
     );
     res.json({ success: true, message: "Preços atualizados com sucesso." });
@@ -864,7 +1240,11 @@ app.post("/api/viaturas", async (req, res) => {
   try {
     await run(
       `INSERT INTO viaturas (matricula, marca, modelo, tipo, ano, kilometragem, km_atual, capacidade, combustivel, estado, observacoes)
+<<<<<<< HEAD
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+=======
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
       [matricula, marca, modelo, tipo, ano, kilometragem || 0, km_atual || 0, capacidade, combustivel, estado || "Disponível", observacoes]
     );
     res.json({ success: true, message: "Viatura registada com sucesso." });
@@ -878,8 +1258,12 @@ app.put("/api/viaturas/:id", async (req, res) => {
   const { matricula, marca, modelo, tipo, ano, kilometragem, km_atual, capacidade, combustivel, estado, observacoes } = req.body;
   try {
     await run(
+<<<<<<< HEAD
       `UPDATE viaturas SET matricula = ?, marca = ?, modelo = ?, tipo = ?, ano = ?, kilometragem = ?, km_atual = ?, capacidade = ?, combustivel = ?, estado = ?, observacoes = ?
        WHERE id = ?`,
+=======
+      `UPDATE viaturas SET matricula = $1, marca = $2, modelo = $3, tipo = $4, ano = $5, kilometragem = $6, km_atual = $7, capacidade = $8, combustivel = $9, estado = $10, observacoes = $11 WHERE id = $12`,
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
       [matricula, marca, modelo, tipo, ano, kilometragem, km_atual, capacidade, combustivel, estado, observacoes, id]
     );
     res.json({ success: true, message: "Viatura atualizada com sucesso." });
@@ -891,14 +1275,22 @@ app.put("/api/viaturas/:id", async (req, res) => {
 app.delete("/api/viaturas/:id", async (req, res) => {
   const { id } = req.params;
   try {
+<<<<<<< HEAD
     await run("DELETE FROM viaturas WHERE id = ?", [id]);
+=======
+    await run("DELETE FROM viaturas WHERE id = $1", [id]);
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     res.json({ success: true, message: "Viatura removida com sucesso." });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
+<<<<<<< HEAD
 // 4. Motoristas (Drivers - Now mapped to funcionarios table)
+=======
+// 4. Motoristas
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
 app.get("/api/motoristas", async (req, res) => {
   try {
     const list = await query("SELECT * FROM funcionarios WHERE cargo = 'Motorista' OR cargo = 'motorista' ORDER BY nome ASC");
@@ -911,6 +1303,7 @@ app.get("/api/motoristas", async (req, res) => {
 app.post("/api/motoristas", async (req, res) => {
   const { nome, email, telefone, carta_conducao, validade_carta, ativo, categoria_carta, bi, nuit, observacoes, score } = req.body;
   try {
+<<<<<<< HEAD
     // Generate credentials
     const username = nome
       .toLowerCase()
@@ -930,6 +1323,20 @@ app.post("/api/motoristas", async (req, res) => {
     await run(
       `INSERT INTO funcionarios (nome, email, telefone, carta_conducao, validade_carta, ativo, categoria_carta, bi, nuit, observacoes, score, cargo, salario_base, data_admissao, usuario_id)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Motorista', 18500, ?, ?)`,
+=======
+    const username = nome.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+    const password = `${username}.123`;
+    const hashedPassword = hashPassword(password);
+
+    const userResult = await run(`
+      INSERT INTO usuarios (email, senha, nome, role)
+      VALUES ($1, $2, $3, 'funcionario')
+    `, [username, hashedPassword, nome]);
+
+    await run(
+      `INSERT INTO funcionarios (nome, email, telefone, carta_conducao, validade_carta, ativo, categoria_carta, bi, nuit, observacoes, score, cargo, salario_base, data_admissao, usuario_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'Motorista', 18500, $12, $13)`,
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
       [
         nome, email, telefone, carta_conducao, validade_carta, 
         ativo !== undefined ? ativo : 1, categoria_carta, bi, nuit, observacoes, 
@@ -939,7 +1346,10 @@ app.post("/api/motoristas", async (req, res) => {
       ]
     );
 
+<<<<<<< HEAD
     // Log the creation
+=======
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     await logActivity(null, "Recursos Humanos", "Registo de Motorista", `Motorista "${nome}" registado com usuário de login "${username}".`);
 
     res.json({ 
@@ -955,6 +1365,7 @@ app.put("/api/motoristas/:id", async (req, res) => {
   const { id } = req.params;
   const { nome, email, telefone, carta_conducao, validade_carta, ativo, categoria_carta, bi, nuit, observacoes, score } = req.body;
   try {
+<<<<<<< HEAD
     // Sync name in usuarios if matched
     const existing = await get<any>("SELECT usuario_id FROM funcionarios WHERE id = ?", [id]);
     if (existing && existing.usuario_id) {
@@ -968,6 +1379,18 @@ app.put("/api/motoristas/:id", async (req, res) => {
     );
 
     // Log the update
+=======
+    const existing = await get<any>("SELECT usuario_id FROM funcionarios WHERE id = $1", [id]);
+    if (existing && existing.usuario_id) {
+      await run("UPDATE usuarios SET nome = $1 WHERE id = $2", [nome, existing.usuario_id]);
+    }
+
+    await run(
+      `UPDATE funcionarios SET nome = $1, email = $2, telefone = $3, carta_conducao = $4, validade_carta = $5, ativo = $6, categoria_carta = $7, bi = $8, nuit = $9, observacoes = $10, score = $11 WHERE id = $12`,
+      [nome, email, telefone, carta_conducao, validade_carta, ativo, categoria_carta, bi, nuit, observacoes, score, id]
+    );
+
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     await logActivity(null, "Recursos Humanos", "Edição de Motorista", `Motorista ID ${id} (${nome}) atualizado.`);
 
     res.json({ success: true, message: "Motorista atualizado com sucesso." });
@@ -979,6 +1402,7 @@ app.put("/api/motoristas/:id", async (req, res) => {
 app.delete("/api/motoristas/:id", async (req, res) => {
   const { id } = req.params;
   try {
+<<<<<<< HEAD
     const existing = await get<any>("SELECT nome, usuario_id FROM funcionarios WHERE id = ?", [id]);
     if (existing && existing.usuario_id) {
       await run("DELETE FROM usuarios WHERE id = ?", [existing.usuario_id]);
@@ -986,6 +1410,14 @@ app.delete("/api/motoristas/:id", async (req, res) => {
     await run("DELETE FROM funcionarios WHERE id = ?", [id]);
 
     // Log deletion
+=======
+    const existing = await get<any>("SELECT nome, usuario_id FROM funcionarios WHERE id = $1", [id]);
+    if (existing && existing.usuario_id) {
+      await run("DELETE FROM usuarios WHERE id = $1", [existing.usuario_id]);
+    }
+    await run("DELETE FROM funcionarios WHERE id = $1", [id]);
+
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     const mName = existing ? existing.nome : `ID ${id}`;
     await logActivity(null, "Administrador/RH", "Exclusão de Motorista", `Motorista "${mName}" removido permanentemente.`);
 
@@ -995,7 +1427,11 @@ app.delete("/api/motoristas/:id", async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 // 5. Bombas (Fuel Stations)
+=======
+// 5. Bombas
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
 app.get("/api/bombas", async (req, res) => {
   try {
     const list = await query("SELECT * FROM bombas ORDER BY nome ASC");
@@ -1010,7 +1446,11 @@ app.post("/api/bombas", async (req, res) => {
   try {
     await run(
       `INSERT INTO bombas (nome, endereco, contacto, provincia, ativo, preco_diesel, preco_gasolina, preco_gas)
+<<<<<<< HEAD
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+=======
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
       [nome, endereco, contacto, provincia, ativo !== undefined ? ativo : 1, preco_diesel, preco_gasolina, preco_gas]
     );
     res.json({ success: true, message: "Bomba de abastecimento registada com sucesso." });
@@ -1024,8 +1464,12 @@ app.put("/api/bombas/:id", async (req, res) => {
   const { nome, endereco, contacto, provincia, ativo, preco_diesel, preco_gasolina, preco_gas } = req.body;
   try {
     await run(
+<<<<<<< HEAD
       `UPDATE bombas SET nome = ?, endereco = ?, contacto = ?, provincia = ?, ativo = ?, preco_diesel = ?, preco_gasolina = ?, preco_gas = ?
        WHERE id = ?`,
+=======
+      `UPDATE bombas SET nome = $1, endereco = $2, contacto = $3, provincia = $4, ativo = $5, preco_diesel = $6, preco_gasolina = $7, preco_gas = $8 WHERE id = $9`,
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
       [nome, endereco, contacto, provincia, ativo, preco_diesel, preco_gasolina, preco_gas, id]
     );
     res.json({ success: true, message: "Bomba de abastecimento atualizada com sucesso." });
@@ -1037,7 +1481,11 @@ app.put("/api/bombas/:id", async (req, res) => {
 app.delete("/api/bombas/:id", async (req, res) => {
   const { id } = req.params;
   try {
+<<<<<<< HEAD
     await run("DELETE FROM bombas WHERE id = ?", [id]);
+=======
+    await run("DELETE FROM bombas WHERE id = $1", [id]);
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     res.json({ success: true, message: "Bomba removida com sucesso." });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
@@ -1072,14 +1520,22 @@ app.get("/api/alertas", async (req, res) => {
 app.put("/api/alertas/:id/resolver", async (req, res) => {
   const { id } = req.params;
   try {
+<<<<<<< HEAD
     await run("UPDATE alertas SET resolvido = 1 WHERE id = ?", [id]);
+=======
+    await run("UPDATE alertas SET resolvido = 1 WHERE id = $1::text", [id]);
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     res.json({ success: true, message: "Alerta resolvido com sucesso." });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
+<<<<<<< HEAD
 // 8. Viagens (Trips) - Rich endpoints
+=======
+// 8. Viagens
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
 app.get("/api/viagens", async (req, res) => {
   try {
     const list = await query(`
@@ -1099,7 +1555,10 @@ app.get("/api/viagens", async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 // POST /api/viagens - Create a trip & auto-refuel
+=======
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
 app.post("/api/viagens", async (req, res) => {
   const {
     numero_viagem,
@@ -1117,19 +1576,31 @@ app.post("/api/viagens", async (req, res) => {
   } = req.body;
 
   try {
+<<<<<<< HEAD
     // 1. Resolve vehicle and pump prices to do calculations
     const viatura = await get<any>("SELECT * FROM viaturas WHERE id = ?", [viatura_id]);
+=======
+    const viatura = await get<any>("SELECT * FROM viaturas WHERE id = $1", [viatura_id]);
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     if (!viatura) {
       return res.status(404).json({ success: false, message: "Viatura não encontrada." });
     }
 
+<<<<<<< HEAD
     const bomba = await get<any>("SELECT * FROM bombas WHERE id = ?", [bomba_id]);
+=======
+    const bomba = await get<any>("SELECT * FROM bombas WHERE id = $1", [bomba_id]);
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     if (!bomba) {
       return res.status(404).json({ success: false, message: "Bomba não encontrada." });
     }
 
+<<<<<<< HEAD
     // Determine fuel price per liter
     let valor_unitario = 91.5; // default fallback
+=======
+    let valor_unitario = 91.5;
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     const fuelType = viatura.combustivel.toLowerCase();
 
     if (fuelType.includes("diesel")) {
@@ -1140,9 +1611,14 @@ app.post("/api/viagens", async (req, res) => {
       valor_unitario = bomba.preco_gas || 0;
     }
 
+<<<<<<< HEAD
     // If pump doesn't have custom price, load province price
     if (valor_unitario === 0) {
       const provPrice = await get<any>("SELECT * FROM precos_provincias WHERE provincia = ?", [bomba.provincia]);
+=======
+    if (valor_unitario === 0) {
+      const provPrice = await get<any>("SELECT * FROM precos_provincias WHERE provincia = $1::text", [bomba.provincia]);
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
       if (provPrice) {
         if (fuelType.includes("diesel")) valor_unitario = provPrice.diesel;
         else if (fuelType.includes("gasolina")) valor_unitario = provPrice.gasolina;
@@ -1150,11 +1626,17 @@ app.post("/api/viagens", async (req, res) => {
       }
     }
 
+<<<<<<< HEAD
     // Calculate totals
     const total_combustivel_mzn = litros_bomba * valor_unitario;
     const diferenca_litros = litros_bomba - litros_sistema;
 
     // 2. Insert Voyage
+=======
+    const total_combustivel_mzn = litros_bomba * valor_unitario;
+    const diferenca_litros = litros_bomba - litros_sistema;
+
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     const result = await run(
       `INSERT INTO viagens (
         numero_viagem, data_partida, data_chegada, viatura_id, motorista_id, bomba_id,
@@ -1163,7 +1645,11 @@ app.post("/api/viagens", async (req, res) => {
         combustivel_gasto_mzn, expediente, reforcos,
         intermediacao_mzn, escolta_mzn, quebras_faltas_mzn, faturacao_mzn, total_remanescente_mzn,
         estado, observacoes
+<<<<<<< HEAD
       ) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL, NULL, 0, 0, 0, 0, 0, ?, ? )`,
+=======
+      ) VALUES ($1, $2, NULL, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NULL, NULL, $14, NULL, NULL, 0, 0, 0, 0, 0, $15, $16)`,
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
       [
         numero_viagem,
         data_partida,
@@ -1178,18 +1664,29 @@ app.post("/api/viagens", async (req, res) => {
         produto,
         origem,
         destino,
+<<<<<<< HEAD
         total_combustivel_mzn, // Initial fuel cost is the spent fuel
+=======
+        total_combustivel_mzn,
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
         "em_curso",
         observacoes
       ]
     );
 
+<<<<<<< HEAD
     // 3. Register fuel record in abastecimentos
+=======
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     await run(
       `INSERT INTO abastecimentos (
         viatura_id, viagem, cliente, data_abastecimento, bomba_name, provincia,
         bomba_litros, sistema_litros, diferenca, valor_combustivel, valor_unitario, observacoes
+<<<<<<< HEAD
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+=======
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
       [
         viatura_id,
         numero_viagem,
@@ -1206,17 +1703,26 @@ app.post("/api/viagens", async (req, res) => {
       ]
     );
 
+<<<<<<< HEAD
     // 4. Update vehicle state
     await run("UPDATE viaturas SET estado = 'Em Viagem' WHERE id = ?", [viatura_id]);
 
     // 5. Check for consumption deviation and trigger automatic alert
+=======
+    await run("UPDATE viaturas SET estado = 'Em Viagem' WHERE id = $1", [viatura_id]);
+
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     const percentDev = litros_sistema > 0 ? (Math.abs(diferenca_litros) / litros_sistema) * 100 : 0;
     if (Math.abs(diferenca_litros) >= 5 || percentDev >= 3) {
       const alertId = `ALERT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       const severity = Math.abs(diferenca_litros) >= 20 ? "alta" : "media";
       await run(
         `INSERT INTO alertas (id, data_hora, tipo, titulo, mensagem, resolvido, gravidade, meta)
+<<<<<<< HEAD
          VALUES (?, ?, ?, ?, ?, 0, ?, ?)`,
+=======
+         VALUES ($1, $2, $3, $4, $5, 0, $6, $7)`,
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
          [
            alertId,
            new Date().toISOString(),
@@ -1228,8 +1734,12 @@ app.post("/api/viagens", async (req, res) => {
          ]
       );
 
+<<<<<<< HEAD
       // Decrement driver score slightly due to fuel deviation
       await run("UPDATE motoristas SET score = MAX(0, score - 5) WHERE id = ?", [motorista_id]);
+=======
+      await run("UPDATE motoristas SET score = MAX(0, score - 5) WHERE id = $1", [motorista_id]);
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     }
 
     res.json({ success: true, message: "Viagem iniciada com sucesso.", tripId: result.lastID });
@@ -1238,7 +1748,10 @@ app.post("/api/viagens", async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 // PUT /api/viagens/:id - Edit / Close Voyage
+=======
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
 app.put("/api/viagens/:id", async (req, res) => {
   const { id } = req.params;
   const {
@@ -1257,19 +1770,28 @@ app.put("/api/viagens/:id", async (req, res) => {
   } = req.body;
 
   try {
+<<<<<<< HEAD
     const trip = await get<any>("SELECT * FROM viagens WHERE id = ?", [id]);
+=======
+    const trip = await get<any>("SELECT * FROM viagens WHERE id = $1", [id]);
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     if (!trip) {
       return res.status(404).json({ success: false, message: "Viagem não encontrada." });
     }
 
+<<<<<<< HEAD
     // Get fuel cost (constant from initial refuel)
     const combustivel_gasto_mzn = trip.total_combustivel_mzn;
 
     // Intermediate, Escort, Breakages/Shortages and Billing details
+=======
+    const combustivel_gasto_mzn = trip.total_combustivel_mzn;
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     const intermediacao = Number(intermediacao_mzn || 0);
     const escolta = Number(escolta_mzn || 0);
     const quebras = Number(quebras_faltas_mzn || 0);
     const faturacao = Number(faturacao_mzn || 0);
+<<<<<<< HEAD
 
     // Calculate total remaining
     // total_remanescente = faturacao - (combustivel_gasto + intermediacao + escolta + quebras)
@@ -1291,6 +1813,25 @@ app.put("/api/viagens/:id", async (req, res) => {
         p_o = ?,
         origem_combustivel = ?
        WHERE id = ?`,
+=======
+    const total_remanescente_mzn = faturacao - (combustivel_gasto_mzn + intermediacao + escolta + quebras);
+
+    await run(
+      `UPDATE viagens SET
+        estado = $1,
+        data_chegada = $2,
+        intermediacao_mzn = $3,
+        escolta_mzn = $4,
+        quebras_faltas_mzn = $5,
+        faturacao_mzn = $6,
+        total_remanescente_mzn = $7,
+        observacoes = $8,
+        expediente = $9,
+        reforcos = $10,
+        p_o = $11,
+        origem_combustivel = $12
+       WHERE id = $13`,
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
       [
         estado,
         data_chegada,
@@ -1308,11 +1849,18 @@ app.put("/api/viagens/:id", async (req, res) => {
       ]
     );
 
+<<<<<<< HEAD
     // If the trip is finished (concluida), update vehicle status and current mileage
     if (estado === "concluida") {
       await run("UPDATE viaturas SET estado = 'Disponível' WHERE id = ?", [trip.viatura_id]);
       if (km_chegada) {
         await run("UPDATE viaturas SET km_atual = ? WHERE id = ?", [km_chegada, trip.viatura_id]);
+=======
+    if (estado === "concluida") {
+      await run("UPDATE viaturas SET estado = 'Disponível' WHERE id = $1", [trip.viatura_id]);
+      if (km_chegada) {
+        await run("UPDATE viaturas SET km_atual = $1 WHERE id = $2", [km_chegada, trip.viatura_id]);
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
       }
     }
 
@@ -1322,9 +1870,13 @@ app.put("/api/viagens/:id", async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 // ---------------- ADDITIONAL ADVANCED HR & FLEET MANAGEMENT ROUTES ----------------
 
 // 1. General Employees (Funcionários) CRUD
+=======
+// 9. Funcionários (Employees) - COMPLETE CRUD
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
 app.get("/api/funcionarios", async (req, res) => {
   try {
     const list = await query("SELECT * FROM funcionarios ORDER BY nome ASC");
@@ -1341,6 +1893,7 @@ app.post("/api/funcionarios", async (req, res) => {
     empresa_nome, empresa_nuit, empresa_localizacao 
   } = req.body;
   try {
+<<<<<<< HEAD
     // Generate credentials
     const username = nome
       .toLowerCase()
@@ -1351,6 +1904,12 @@ app.post("/api/funcionarios", async (req, res) => {
     const hashedPassword = hashPassword(password);
 
     // Map cargo to user role
+=======
+    const username = nome.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+    const password = `${username}.123`;
+    const hashedPassword = hashPassword(password);
+
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     let userRole = "funcionario";
     const cargoLower = (cargo || "").toLowerCase();
     if (cargoLower.includes("it") || cargoLower.includes("admin")) {
@@ -1361,6 +1920,7 @@ app.post("/api/funcionarios", async (req, res) => {
       userRole = "administracao";
     }
 
+<<<<<<< HEAD
     // Insert into usuarios
     const userResult = await run(`
       INSERT INTO usuarios (email, senha, nome, role)
@@ -1368,13 +1928,24 @@ app.post("/api/funcionarios", async (req, res) => {
     `, [username, hashedPassword, nome, userRole]);
 
     // Insert into funcionarios
+=======
+    const userResult = await run(`
+      INSERT INTO usuarios (email, senha, nome, role)
+      VALUES ($1, $2, $3, $4)
+    `, [username, hashedPassword, nome, userRole]);
+
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     await run(`
       INSERT INTO funcionarios (
         nome, email, telefone, carta_conducao, validade_carta, ativo, categoria_carta, 
         bi, nuit, observacoes, score, cargo, salario_base, data_admissao, usuario_id,
         empresa_nome, empresa_nuit, empresa_localizacao
       )
+<<<<<<< HEAD
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+=======
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     `, [
       nome, email, telefone,
       carta_conducao || null, validade_carta || null,
@@ -1389,7 +1960,10 @@ app.post("/api/funcionarios", async (req, res) => {
       empresa_localizacao || 'Porto de Maputo, Recinto Portuário, Maputo, Moçambique'
     ]);
 
+<<<<<<< HEAD
     // Log the creation
+=======
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     await logActivity(null, "Recursos Humanos", "Registo de Funcionário", `Funcionário "${nome}" (${cargo}) registado com usuário "${username}".`);
 
     res.json({
@@ -1409,9 +1983,14 @@ app.put("/api/funcionarios/:id", async (req, res) => {
     empresa_nome, empresa_nuit, empresa_localizacao 
   } = req.body;
   try {
+<<<<<<< HEAD
     const existing = await get<any>("SELECT * FROM funcionarios WHERE id = ?", [id]);
     if (existing && existing.usuario_id) {
       // Sync role in usuarios if cargo changes
+=======
+    const existing = await get<any>("SELECT * FROM funcionarios WHERE id = $1", [id]);
+    if (existing && existing.usuario_id) {
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
       let userRole = "funcionario";
       const cargoLower = (cargo || "").toLowerCase();
       if (cargoLower.includes("it") || cargoLower.includes("admin")) {
@@ -1422,14 +2001,24 @@ app.put("/api/funcionarios/:id", async (req, res) => {
         userRole = "administracao";
       }
 
+<<<<<<< HEAD
       await run("UPDATE usuarios SET nome = ?, role = ? WHERE id = ?", [nome, userRole, existing.usuario_id]);
+=======
+      await run("UPDATE usuarios SET nome = $1, role = $2 WHERE id = $3", [nome, userRole, existing.usuario_id]);
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     }
 
     await run(`
       UPDATE funcionarios
+<<<<<<< HEAD
       SET nome = ?, email = ?, telefone = ?, carta_conducao = ?, validade_carta = ?, ativo = ?, categoria_carta = ?, bi = ?, nuit = ?, observacoes = ?, score = ?, cargo = ?, salario_base = ?, data_admissao = ?,
           empresa_nome = ?, empresa_nuit = ?, empresa_localizacao = ?
       WHERE id = ?
+=======
+      SET nome = $1, email = $2, telefone = $3, carta_conducao = $4, validade_carta = $5, ativo = $6, categoria_carta = $7, bi = $8, nuit = $9, observacoes = $10, score = $11, cargo = $12, salario_base = $13, data_admissao = $14,
+          empresa_nome = $15, empresa_nuit = $16, empresa_localizacao = $17
+      WHERE id = $18
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     `, [
       nome, email, telefone, carta_conducao, validade_carta, ativo, categoria_carta, bi, nuit, observacoes, score, cargo, Number(salario_base), data_admissao,
       empresa_nome || 'RHINO CARGO, LIMITADA',
@@ -1438,7 +2027,10 @@ app.put("/api/funcionarios/:id", async (req, res) => {
       id
     ]);
 
+<<<<<<< HEAD
     // Log update
+=======
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     await logActivity(null, "Recursos Humanos", "Edição de Funcionário", `Funcionário ID ${id} (${nome}) atualizado.`);
 
     res.json({ success: true, message: "Funcionário atualizado com sucesso." });
@@ -1450,6 +2042,7 @@ app.put("/api/funcionarios/:id", async (req, res) => {
 app.delete("/api/funcionarios/:id", async (req, res) => {
   const { id } = req.params;
   try {
+<<<<<<< HEAD
     const existing = await get<any>("SELECT * FROM funcionarios WHERE id = ?", [id]);
     if (existing && existing.usuario_id) {
       await run("DELETE FROM usuarios WHERE id = ?", [existing.usuario_id]);
@@ -1457,6 +2050,14 @@ app.delete("/api/funcionarios/:id", async (req, res) => {
     await run("DELETE FROM funcionarios WHERE id = ?", [id]);
 
     // Log deletion
+=======
+    const existing = await get<any>("SELECT * FROM funcionarios WHERE id = $1", [id]);
+    if (existing && existing.usuario_id) {
+      await run("DELETE FROM usuarios WHERE id = $1", [existing.usuario_id]);
+    }
+    await run("DELETE FROM funcionarios WHERE id = $1", [id]);
+
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     const fName = existing ? existing.nome : `ID ${id}`;
     await logActivity(null, "Administrador/RH", "Exclusão de Funcionário", `Funcionário "${fName}" removido permanentemente do sistema.`);
 
@@ -1466,7 +2067,11 @@ app.delete("/api/funcionarios/:id", async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 // 2. General Company Expenses (Despesas Gerais) CRUD
+=======
+// 10. Despesas Gerais
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
 app.get("/api/despesas_gerais", async (req, res) => {
   try {
     const list = await query(`
@@ -1487,7 +2092,11 @@ app.post("/api/despesas_gerais", async (req, res) => {
   try {
     await run(`
       INSERT INTO despesas_gerais (descricao, categoria, valor, data_despesa, funcionario_id, viatura_id, estado, observacoes)
+<<<<<<< HEAD
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+=======
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     `, [descricao, categoria, Number(valor), data_despesa, funcionario_id || null, viatura_id || null, estado || 'Pago', observacoes]);
     res.json({ success: true, message: "Despesa registada com sucesso." });
   } catch (error: any) {
@@ -1501,8 +2110,13 @@ app.put("/api/despesas_gerais/:id", async (req, res) => {
   try {
     await run(`
       UPDATE despesas_gerais
+<<<<<<< HEAD
       SET descricao = ?, categoria = ?, valor = ?, data_despesa = ?, funcionario_id = ?, viatura_id = ?, estado = ?, observacoes = ?
       WHERE id = ?
+=======
+      SET descricao = $1, categoria = $2, valor = $3, data_despesa = $4, funcionario_id = $5, viatura_id = $6, estado = $7, observacoes = $8
+      WHERE id = $9
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     `, [descricao, categoria, Number(valor), data_despesa, funcionario_id || null, viatura_id || null, estado, observacoes, id]);
     res.json({ success: true, message: "Despesa atualizada com sucesso." });
   } catch (error: any) {
@@ -1513,14 +2127,22 @@ app.put("/api/despesas_gerais/:id", async (req, res) => {
 app.delete("/api/despesas_gerais/:id", async (req, res) => {
   const { id } = req.params;
   try {
+<<<<<<< HEAD
     await run("DELETE FROM despesas_gerais WHERE id = ?", [id]);
+=======
+    await run("DELETE FROM despesas_gerais WHERE id = $1", [id]);
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     res.json({ success: true, message: "Despesa removida com sucesso." });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
+<<<<<<< HEAD
 // 3. HR Request Orders (Pedidos de Férias e Dispensas) CRUD
+=======
+// 11. HR Requests
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
 app.get("/api/pedidos_rh", async (req, res) => {
   try {
     const list = await query(`
@@ -1540,7 +2162,11 @@ app.post("/api/pedidos_rh", async (req, res) => {
   try {
     await run(`
       INSERT INTO pedidos_rh (funcionario_id, tipo, data_inicio, data_fim, dias, motivo, estado, data_pedido, observacoes)
+<<<<<<< HEAD
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+=======
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     `, [
       funcionario_id, tipo, data_inicio, data_fim, Number(dias), motivo,
       estado || 'Pendente', new Date().toISOString().split("T")[0], observacoes
@@ -1555,7 +2181,11 @@ app.put("/api/pedidos_rh/:id", async (req, res) => {
   const { id } = req.params;
   const { estado, observacoes } = req.body;
   try {
+<<<<<<< HEAD
     await run("UPDATE pedidos_rh SET estado = ?, observacoes = ? WHERE id = ?", [estado, observacoes, id]);
+=======
+    await run("UPDATE pedidos_rh SET estado = $1, observacoes = $2 WHERE id = $3", [estado, observacoes, id]);
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     res.json({ success: true, message: "Pedido de RH atualizado com sucesso." });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
@@ -1565,14 +2195,22 @@ app.put("/api/pedidos_rh/:id", async (req, res) => {
 app.delete("/api/pedidos_rh/:id", async (req, res) => {
   const { id } = req.params;
   try {
+<<<<<<< HEAD
     await run("DELETE FROM pedidos_rh WHERE id = ?", [id]);
+=======
+    await run("DELETE FROM pedidos_rh WHERE id = $1", [id]);
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     res.json({ success: true, message: "Pedido removido com sucesso." });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
+<<<<<<< HEAD
 // 4. Payslips (Recibos de Salários) CRUD
+=======
+// 12. Payslips
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
 app.get("/api/recibos_salarios", async (req, res) => {
   try {
     const list = await query(`
@@ -1621,7 +2259,11 @@ app.post("/api/recibos_salarios", async (req, res) => {
         salario_liquido, data_emissao, estado, observacoes,
         faltas, subsidios, horas_extras, inss, irps
       )
+<<<<<<< HEAD
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+=======
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     `, [
       funcionario_id, mes_ano, s_base, s_bonus, s_desc, 
       s_liq, new Date().toISOString().split("T")[0], estado || 'Pago', observacoes,
@@ -1663,6 +2305,7 @@ app.put("/api/recibos_salarios/:id", async (req, res) => {
 
     await run(`
       UPDATE recibos_salarios 
+<<<<<<< HEAD
       SET funcionario_id = ?, 
           mes_ano = ?, 
           salario_base = ?, 
@@ -1677,6 +2320,22 @@ app.put("/api/recibos_salarios/:id", async (req, res) => {
           inss = ?, 
           irps = ?
       WHERE id = ?
+=======
+      SET funcionario_id = $1, 
+          mes_ano = $2, 
+          salario_base = $3, 
+          bonus = $4, 
+          descontos = $5, 
+          salario_liquido = $6, 
+          estado = $7, 
+          observacoes = $8,
+          faltas = $9, 
+          subsidios = $10, 
+          horas_extras = $11, 
+          inss = $12, 
+          irps = $13
+      WHERE id = $14
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     `, [
       funcionario_id, mes_ano, s_base, s_bonus, s_desc, 
       s_liq, estado, observacoes,
@@ -1691,23 +2350,36 @@ app.put("/api/recibos_salarios/:id", async (req, res) => {
 app.delete("/api/recibos_salarios/:id", async (req, res) => {
   const { id } = req.params;
   try {
+<<<<<<< HEAD
     await run("DELETE FROM recibos_salarios WHERE id = ?", [id]);
+=======
+    await run("DELETE FROM recibos_salarios WHERE id = $1", [id]);
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     res.json({ success: true, message: "Recibo de salário removido com sucesso." });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
+<<<<<<< HEAD
 // 9. Performance Statistics Dashboard Data
 app.get("/api/performance", async (req, res) => {
   try {
     // Basic fleet metrics
+=======
+// 13. Performance
+app.get("/api/performance", async (req, res) => {
+  try {
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     const totalV = await get<{ count: number }>("SELECT COUNT(*) as count FROM viaturas");
     const activeV = await get<{ count: number }>("SELECT COUNT(*) as count FROM viaturas WHERE estado = 'Em Viagem'");
     const totalM = await get<{ count: number }>("SELECT COUNT(*) as count FROM motoristas");
     const resolvedA = await get<{ count: number }>("SELECT COUNT(*) as count FROM alertas WHERE resolvido = 0");
 
+<<<<<<< HEAD
     // Financial summaries
+=======
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     const financials = await get<any>(`
       SELECT 
         SUM(faturacao_mzn) as total_faturacao,
@@ -1719,7 +2391,10 @@ app.get("/api/performance", async (req, res) => {
       FROM viagens
     `);
 
+<<<<<<< HEAD
     // Fuel deviation total
+=======
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     const deviationStats = await get<any>(`
       SELECT 
         SUM(ABS(diferenca_litros)) as total_desvio_litros,
@@ -1727,14 +2402,20 @@ app.get("/api/performance", async (req, res) => {
       FROM viagens
     `);
 
+<<<<<<< HEAD
     // Driver score averages
+=======
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     const driversPerformance = await query(`
       SELECT nome, score, email, telefone, categoria_carta, bi
       FROM motoristas
       ORDER BY score DESC, nome ASC
     `);
 
+<<<<<<< HEAD
     // Fuel consumption and trips by province
+=======
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     const fuelByProvince = await query(`
       SELECT b.provincia, SUM(a.bomba_litros) as total_litros, SUM(a.valor_combustivel) as total_gasto
       FROM abastecimentos a
@@ -1743,7 +2424,10 @@ app.get("/api/performance", async (req, res) => {
       ORDER BY total_gasto DESC
     `);
 
+<<<<<<< HEAD
     // Trips over time
+=======
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
     const tripsHistory = await query(`
       SELECT id, numero_viagem, data_partida, total_combustivel_mzn, faturacao_mzn, total_remanescente_mzn, estado, cliente
       FROM viagens
@@ -1774,7 +2458,11 @@ app.get("/api/performance", async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 // 13. System Audit Log / Registo de Atividades
+=======
+// 14. Audit Logs
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
 app.get("/api/auditoria_logs", async (req, res) => {
   try {
     const logs = await query("SELECT * FROM auditoria_logs ORDER BY id DESC LIMIT 500");
@@ -1794,9 +2482,13 @@ app.post("/api/auditoria_logs/clear", async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 
 // ---------------- VITE MIDDLEWARE CONFIG ----------------
 
+=======
+// ---------------- VITE MIDDLEWARE ----------------
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -1817,4 +2509,8 @@ async function startServer() {
   });
 }
 
+<<<<<<< HEAD
 startServer();
+=======
+startServer();
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f

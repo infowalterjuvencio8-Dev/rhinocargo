@@ -6,7 +6,11 @@ import {
   Clock, X, AlertTriangle, FileSpreadsheet
 } from "lucide-react";
 import { Viagem, Viatura, Motorista, Bomba, PrecoProvincia, Usuario } from "../types";
+<<<<<<< HEAD
 import logoImg from "./logo.png";
+=======
+import logoImg from "./Logo.svg";
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
 
 
 interface ViagensProps {
@@ -1079,6 +1083,7 @@ export default function Viagens({
               </div>
 
               {/* Printable Area */}
+<<<<<<< HEAD
               <div className="p-8 space-y-6 bg-slate-950 text-slate-100 max-h-[75vh] overflow-y-auto print-card print:bg-white print:text-slate-900" id="printable-trip-receipt">
                 
                 {/* Invoice style Header */}
@@ -1087,15 +1092,32 @@ export default function Viagens({
                     <img src={logoImg} className="h-12 w-auto object-contain print:h-12" alt="RHINO CARGO" />
                     <div className="space-y-1">
                       <h1 className="text-xl font-bold tracking-tight text-white uppercase print:text-[#283B91]">RHINO CARGO LDA</h1>
+=======
+              <div className="p-8 space-y-6 bg-slate-950 text-slate-100 max-h-[75vh] overflow-y-auto print-card" id="printable-trip-receipt">
+                
+                {/* Invoice style Header */}
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-4 border-b border-slate-800 pb-5">
+                  <div className="flex items-center gap-3">
+                    <img src={logoImg} className="h-12 w-auto object-contain print:h-12" alt="RHINO CARGO" />
+                    <div className="space-y-1">
+                      <h1 className="text-xl font-bold tracking-tight text-white uppercase print:text-slate-900">RHINO CARGO LDA</h1>
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
                       <p className="text-xs text-slate-400 print:text-slate-600">Transporte de Carga e Logística Integrada Moçambique</p>
                       <p className="text-[10px] text-slate-500 print:text-slate-600">Maputo Cidade, Moçambique • Contacto: +258 84 100 2000</p>
                     </div>
                   </div>
                   <div className="text-right">
+<<<<<<< HEAD
                     <span className="text-[10px] uppercase font-bold text-[#EA088C] tracking-wider">Cód. Identificador</span>
                     <h2 className="text-2xl font-mono font-bold text-white">{selectedTrip.numero_viagem}</h2>
                     <span className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 mt-1 rounded ${
                       selectedTrip.estado === "concluida" ? "bg-[#38B44A]/20 text-[#38B44A]" : "bg-[#EA088C]/20 text-[#EA088C]"
+=======
+                    <span className="text-[10px] uppercase font-semibold text-amber-500 tracking-wider">Cód. Identificador</span>
+                    <h2 className="text-2xl font-mono font-bold text-white">{selectedTrip.numero_viagem}</h2>
+                    <span className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 mt-1 rounded ${
+                      selectedTrip.estado === "concluida" ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/20 text-amber-500"
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
                     }`}>
                       {selectedTrip.estado === "concluida" ? "CONCLUÍDA" : "EM CURSO"}
                     </span>
@@ -1107,7 +1129,11 @@ export default function Viagens({
                   
                   {/* Left Column: Operation Details */}
                   <div className="space-y-3.5">
+<<<<<<< HEAD
                     <h4 className="font-bold uppercase tracking-wider text-[#283B91] dark:text-blue-400 print:text-[#283B91] text-[10px] border-b border-slate-800 pb-1">1. Informação Operacional</h4>
+=======
+                    <h4 className="font-bold uppercase tracking-wider text-amber-500 text-[10px] border-b border-slate-800 pb-1">1. Informação Operacional</h4>
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
                     
                     <div className="grid grid-cols-3 gap-y-2 text-slate-300">
                       <span className="text-slate-500 font-semibold">Cliente:</span>
@@ -1132,7 +1158,11 @@ export default function Viagens({
 
                   {/* Right Column: Timeline & Fuel */}
                   <div className="space-y-3.5">
+<<<<<<< HEAD
                     <h4 className="font-bold uppercase tracking-wider text-[#283B91] dark:text-blue-400 print:text-[#283B91] text-[10px] border-b border-slate-800 pb-1">2. Cronograma & Abastecimento</h4>
+=======
+                    <h4 className="font-bold uppercase tracking-wider text-amber-500 text-[10px] border-b border-slate-800 pb-1">2. Cronograma & Abastecimento</h4>
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
 
                     <div className="grid grid-cols-3 gap-y-2 text-slate-300">
                       <span className="text-slate-500 font-semibold">Partida:</span>
@@ -1150,7 +1180,11 @@ export default function Viagens({
                       <span className="col-span-2 font-mono">{selectedTrip.litros_bomba} L (Bomba) / {selectedTrip.litros_sistema} L (Sistema)</span>
 
                       <span className="text-slate-500 font-semibold">Desvio Litros:</span>
+<<<<<<< HEAD
                       <span className={`col-span-2 font-mono font-bold ${Math.abs(selectedTrip.diferenca_litros) > 0 ? "text-[#EA088C]" : "text-[#38B44A]"}`}>
+=======
+                      <span className={`col-span-2 font-mono font-bold ${Math.abs(selectedTrip.diferenca_litros) > 0 ? "text-rose-400" : "text-emerald-400"}`}>
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
                         {selectedTrip.diferenca_litros.toFixed(1)} L
                       </span>
                     </div>
@@ -1159,7 +1193,11 @@ export default function Viagens({
 
                 {/* Financial Summary Breakdown table */}
                 <div className="space-y-3">
+<<<<<<< HEAD
                   <h4 className="font-bold uppercase tracking-wider text-[#283B91] dark:text-blue-400 print:text-[#283B91] text-[10px] border-b border-slate-800 pb-1">3. Demonstrativo Financeiro de Viagem</h4>
+=======
+                  <h4 className="font-bold uppercase tracking-wider text-amber-500 text-[10px] border-b border-slate-800 pb-1">3. Demonstrativo Financeiro de Viagem</h4>
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
 
                   <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
                     <table className="w-full text-left text-xs">
@@ -1203,8 +1241,13 @@ export default function Viagens({
                         </tr>
                         {/* Net remainder balance row */}
                         <tr className="bg-slate-950 font-bold">
+<<<<<<< HEAD
                           <td className="p-3 font-sans uppercase text-[#38B44A] dark:text-emerald-400 print:text-[#283B91]">Remanescente Líquido (Saldo da Viagem)</td>
                           <td colSpan={2} className="p-3 text-right text-[#38B44A] text-sm">
+=======
+                          <td className="p-3 font-sans uppercase text-amber-500">Remanescente Líquido (Saldo da Viagem)</td>
+                          <td colSpan={2} className="p-3 text-right text-emerald-400 text-sm">
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
                             {selectedTrip.total_remanescente_mzn.toLocaleString()} MZN
                           </td>
                         </tr>
@@ -1215,7 +1258,11 @@ export default function Viagens({
 
                 {/* Additional audit notes */}
                 <div className="space-y-2 text-xs">
+<<<<<<< HEAD
                   <span className="font-bold uppercase tracking-wider text-[#283B91] dark:text-blue-400 print:text-[#283B91] text-[10px] block border-b border-slate-800 pb-1">4. Observações de Auditoria</span>
+=======
+                  <span className="font-bold uppercase tracking-wider text-amber-500 text-[10px] block border-b border-slate-800 pb-1">4. Observações de Auditoria</span>
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
                   <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 text-slate-400 leading-relaxed italic">
                     {selectedTrip.observacoes || "Nenhuma ocorrência ou observação de relevo registada durante a rota."}
                   </div>

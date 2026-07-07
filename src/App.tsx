@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from "react";
+<<<<<<< HEAD
 import logoImg from "./components/logo.png";
+=======
+import logoImg from "./components/Logo.svg";
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
 import { 
   LayoutDashboard, Truck, Users, Fuel, ShieldAlert, LogOut, 
   MapPin, UserCheck, RefreshCw, Layers, Coins, CreditCard, Briefcase 

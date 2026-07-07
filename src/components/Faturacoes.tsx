@@ -20,9 +20,42 @@ import {
   Briefcase
 } from "lucide-react";
 import { Viagem, Usuario, Viatura, Motorista } from "../types";
+<<<<<<< HEAD
 import logoImg from "./logo.png";
 
 import { PRINT_LOGO_SVG } from "./LogoConstant";
+=======
+import logoImg from "./Logo.svg";
+
+const PRINT_LOGO_SVG = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 450" style="width: 130px; height: auto; display: block;">
+  <defs>
+    <style>
+      .blue-text { font-family: 'Segoe UI', -apple-system, sans-serif; font-weight: 900; fill: #2E4399; }
+      .pink-text { font-family: 'Segoe UI', -apple-system, sans-serif; font-weight: 900; fill: #E9008C; font-style: italic; }
+      .sub-text { font-family: 'Segoe UI', -apple-system, sans-serif; font-weight: 700; fill: #2E4399; letter-spacing: 11px; }
+    </style>
+  </defs>
+  <g transform="translate(40, 20)">
+    <g id="rhino-illustration" stroke="#2E4399" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 380,180 C 365,150, 395,115, 440,105 C 490,95, 570,95, 610,105 C 640,112, 665,95, 685,90 C 705,85, 715,75, 720,70 C 725,65, 730,75, 725,85 L 715,100 C 726,93, 734,87, 738,84 C 742,81, 745,86, 739,95 L 728,110 C 742,113, 748,119, 745,126 C 741,133, 730,135, 718,135 C 695,135, 680,140, 668,155 C 660,165, 655,175, 655,185 L 590,185 C 575,185, 565,175, 558,165 C 550,155, 535,155, 520,155 L 470,155 C 450,155, 438,170, 430,180 C 422,190, 410,195, 395,195 L 380,195 Z" />
+      <path d="M 630,130 Q 637,137 644,130" stroke-width="4" />
+      <path d="M 710,114 Q 706,116 703,113" stroke-width="4" />
+      <path d="M 595,105 Q 602,85 612,100" stroke-width="4" />
+      <path d="M 580,108 Q 585,90 594,103" stroke-width="3" />
+      <path d="M 380,150 C 372,154, 368,163, 372,172" stroke-width="4" />
+    </g>
+    <text x="50" y="300" class="blue-text" font-size="120" letter-spacing="-3">RHINO</text>
+    <text x="495" y="300" class="pink-text" font-size="120" letter-spacing="-2">cargo</text>
+    <text x="55" y="365" class="sub-text" font-size="24">LOGÍSTICA &amp; SERVIÇOS</text>
+    <g id="chevrons" transform="translate(30, 0)">
+      <path d="M 790,50 L 890,195 L 790,340 L 835,340 L 935,195 L 835,50 Z" fill="#E9008C" />
+      <path d="M 870,145 L 905,195 L 870,245 L 890,245 L 925,195 L 890,145 Z" fill="#32B64A" />
+    </g>
+  </g>
+</svg>
+`;
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
 
 
 interface FaturacoesProps {
@@ -254,6 +287,7 @@ export default function Faturacoes({
           <style>
             body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 30px; color: #2d3748; background: #fff; line-height: 1.5; }
             .report-container { max-width: 1100px; margin: 0 auto; border: 1px solid #e2e8f0; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+<<<<<<< HEAD
             .header-layout { display: flex; justify-content: space-between; align-items: center; background-color: #F0F2FA; padding: 20px; border-radius: 8px; border-bottom: 2px solid #283B91; padding-bottom: 20px; margin-bottom: 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             
             .company-logo-container { width: 80px !important; height: 40px !important; display: flex !important; align-items: center !important; justify-content: center !important; overflow: hidden !important; }
@@ -266,6 +300,12 @@ export default function Faturacoes({
             .company-details { font-size: 9.5px; color: #718096; }
             
             .doc-title-badge { background: #FFF0F6; color: #EA088C; padding: 6px 12px; border-radius: 6px; font-size: 14px; font-weight: bold; text-align: center; height: fit-content; text-transform: uppercase; border: 1px solid #FFD8E4; }
+=======
+            .header-layout { display: flex; justify-content: space-between; border-bottom: 2px solid #2B6CB0; padding-bottom: 20px; margin-bottom: 20px; }
+            .company-info { font-size: 13px; color: #4a5568; line-height: 1.4; }
+            .company-name { font-size: 22px; font-weight: 800; color: #2B6CB0; letter-spacing: -0.5px; margin-bottom: 4px; }
+            .doc-title-badge { background: #EBF8FF; color: #2B6CB0; padding: 6px 12px; border-radius: 6px; font-size: 14px; font-weight: bold; text-align: center; height: fit-content; text-transform: uppercase; border: 1px solid #BEE3F8; }
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
             
             .stats-grid { display: grid; grid-template-cols: repeat(4, 1fr); gap: 15px; margin-bottom: 25px; }
             .stat-card { background: #f7fafc; padding: 15px; border-radius: 6px; border: 1px solid #edf2f7; text-align: center; }
@@ -273,7 +313,11 @@ export default function Faturacoes({
             .stat-label { font-size: 10px; color: #718096; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px; }
 
             .table { width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 11px; }
+<<<<<<< HEAD
             .table th { background: #283B91; color: #ffffff; font-weight: 700; padding: 10px 12px; text-transform: uppercase; font-size: 10px; text-align: left; }
+=======
+            .table th { background: #2B6CB0; color: #ffffff; font-weight: 700; padding: 10px 12px; text-transform: uppercase; font-size: 10px; text-align: left; }
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
             .table td { border-bottom: 1px solid #e2e8f0; padding: 10px 12px; }
             .table tr:nth-child(even) td { background: #fcfdfd; }
             
@@ -290,6 +334,7 @@ export default function Faturacoes({
               <div style="display: flex; align-items: center; gap: 20px;">
                 ${PRINT_LOGO_SVG}
                 <div class="company-info">
+<<<<<<< HEAD
                   <div class="company-name">RHINO CARGO LDA</div>
                   <div class="company-slogan">Força | Flexibilidade | Movimento</div>
                   <div class="company-subtitle">Empresa Moçambicana</div>
@@ -297,6 +342,11 @@ export default function Faturacoes({
                     <div>🚛 Transportes de qualidade &nbsp;&bull;&nbsp; 📦 Entregas para todas províncias</div>
                     <div>📞 +258 871665500 &nbsp;&bull;&nbsp; Av. Romão Fernandes Farinha nr 1504, Maputo, Mozambique 1103</div>
                   </div>
+=======
+                  <div class="company-name">RHINO CARGO, LIMITADA</div>
+                  <div>Porto de Maputo, Recinto Portuário, Maputo, Moçambique</div>
+                  <div>NUIT: 400582914</div>
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
                 </div>
               </div>
               <div class="doc-title-badge">Relatório Financeiro de Faturação</div>
@@ -305,7 +355,11 @@ export default function Faturacoes({
             <div class="stats-grid">
               <div class="stat-card">
                 <div class="stat-label">Total Faturado (Bruto)</div>
+<<<<<<< HEAD
                 <div class="stat-value" style="color: #283B91;">${totalFaturado.toLocaleString("pt-MZ")} MZN</div>
+=======
+                <div class="stat-value">${totalFaturado.toLocaleString("pt-MZ")} MZN</div>
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
               </div>
               <div class="stat-card">
                 <div class="stat-label">Custo de Combustível</div>
@@ -315,9 +369,15 @@ export default function Faturacoes({
                 <div class="stat-label">Custos Extra Operações</div>
                 <div class="stat-value">${totalDespesas.toLocaleString("pt-MZ")} MZN</div>
               </div>
+<<<<<<< HEAD
               <div class="stat-card" style="background: #F0F9F1; border-color: #C2E7C4;">
                 <div class="stat-label">Saldo / Margem Líquida</div>
                 <div class="stat-value" style="color: #38B44A;">${totalLiquido.toLocaleString("pt-MZ")} MZN</div>
+=======
+              <div class="stat-card" style="background: #E6FFFA; border-color: #B2F5EA;">
+                <div class="stat-label">Saldo / Margem Líquida</div>
+                <div class="stat-value" style="color: #234E52;">${totalLiquido.toLocaleString("pt-MZ")} MZN</div>
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
               </div>
             </div>
 
@@ -880,12 +940,20 @@ export default function Faturacoes({
             <div className="p-8 md:p-12 space-y-8 bg-slate-900 text-slate-300 print:bg-white print:text-slate-950 print:p-0">
               
               {/* Invoice Sheet Header */}
+<<<<<<< HEAD
               <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b border-slate-800/80 pb-6 print:bg-[#FAF8EB] print:p-6 print:rounded-xl print:border-b-2 print:border-[#283B91] print:text-slate-900 print:mb-6">
+=======
+              <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b border-slate-800/80 pb-6 print:border-slate-300">
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                   <img src={logoImg} className="h-14 w-auto object-contain print:h-14" alt="RHINO CARGO" />
                   <div className="space-y-1">
                     <div className="flex items-center gap-2.5">
+<<<<<<< HEAD
                       <span className="text-lg font-black text-white tracking-wider uppercase print:text-[#283B91]">RHINO CARGO LDA</span>
+=======
+                      <span className="text-lg font-black text-white tracking-wider uppercase print:text-slate-950">RHINO CARGO LDA</span>
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
                       <span className="text-[9px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-mono font-bold uppercase print:border print:border-slate-300 print:bg-white print:text-slate-700">MOÇAMBIQUE</span>
                     </div>
                     <p className="text-[10px] text-slate-400 font-medium print:text-slate-500">Transportes Internacionais & Logística Integrada</p>
@@ -943,7 +1011,11 @@ export default function Faturacoes({
               <div className="border border-slate-800 rounded-lg overflow-hidden print:border-slate-300">
                 <table className="w-full text-left border-collapse text-[10px]">
                   <thead>
+<<<<<<< HEAD
                     <tr className="bg-slate-950 text-slate-400 uppercase font-bold text-[9px] border-b border-slate-800 print:bg-[#FAF8EB] print:text-[#283B91] print:border-b-2 print:border-[#283B91]/30">
+=======
+                    <tr className="bg-slate-950 text-slate-400 uppercase font-bold text-[9px] border-b border-slate-800 print:bg-slate-100 print:text-slate-900 print:border-slate-300">
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
                       <th className="p-3">Descrição do Serviço / Rota</th>
                       <th className="p-3">Produto</th>
                       <th className="p-3 text-right">Quantidade (Sistemas)</th>

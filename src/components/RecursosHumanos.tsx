@@ -4,9 +4,41 @@ import {
   DollarSign, FileText, Plus, User, Eye, Check, X, ShieldAlert, FileDown, Printer, Pencil
 } from "lucide-react";
 import { PedidoRH, ReciboSalario, Funcionario, Usuario } from "../types";
+<<<<<<< HEAD
 import logoImg from "./logo.png";
 
 import { PRINT_LOGO_SVG } from "./LogoConstant";
+=======
+
+const PRINT_LOGO_SVG = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 450" style="width: 130px; height: auto; display: block;">
+  <defs>
+    <style>
+      .blue-text { font-family: 'Segoe UI', -apple-system, sans-serif; font-weight: 900; fill: #2E4399; }
+      .pink-text { font-family: 'Segoe UI', -apple-system, sans-serif; font-weight: 900; fill: #E9008C; font-style: italic; }
+      .sub-text { font-family: 'Segoe UI', -apple-system, sans-serif; font-weight: 700; fill: #2E4399; letter-spacing: 11px; }
+    </style>
+  </defs>
+  <g transform="translate(40, 20)">
+    <g id="rhino-illustration" stroke="#2E4399" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 380,180 C 365,150, 395,115, 440,105 C 490,95, 570,95, 610,105 C 640,112, 665,95, 685,90 C 705,85, 715,75, 720,70 C 725,65, 730,75, 725,85 L 715,100 C 726,93, 734,87, 738,84 C 742,81, 745,86, 739,95 L 728,110 C 742,113, 748,119, 745,126 C 741,133, 730,135, 718,135 C 695,135, 680,140, 668,155 C 660,165, 655,175, 655,185 L 590,185 C 575,185, 565,175, 558,165 C 550,155, 535,155, 520,155 L 470,155 C 450,155, 438,170, 430,180 C 422,190, 410,195, 395,195 L 380,195 Z" />
+      <path d="M 630,130 Q 637,137 644,130" stroke-width="4" />
+      <path d="M 710,114 Q 706,116 703,113" stroke-width="4" />
+      <path d="M 595,105 Q 602,85 612,100" stroke-width="4" />
+      <path d="M 580,108 Q 585,90 594,103" stroke-width="3" />
+      <path d="M 380,150 C 372,154, 368,163, 372,172" stroke-width="4" />
+    </g>
+    <text x="50" y="300" class="blue-text" font-size="120" letter-spacing="-3">RHINO</text>
+    <text x="495" y="300" class="pink-text" font-size="120" letter-spacing="-2">cargo</text>
+    <text x="55" y="365" class="sub-text" font-size="24">LOGÍSTICA &amp; SERVIÇOS</text>
+    <g id="chevrons" transform="translate(30, 0)">
+      <path d="M 790,50 L 890,195 L 790,340 L 835,340 L 935,195 L 835,50 Z" fill="#E9008C" />
+      <path d="M 870,145 L 905,195 L 870,245 L 890,245 L 925,195 L 890,145 Z" fill="#32B64A" />
+    </g>
+  </g>
+</svg>
+`;
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
 
 import { motion, AnimatePresence } from "motion/react";
 
@@ -337,6 +369,7 @@ export default function RecursosHumanos({ currentUser, onRefreshData }: Recursos
           <style>
             body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 30px; color: #2d3748; background: #fff; line-height: 1.5; }
             .receipt-container { max-width: 800px; margin: 0 auto; border: 1px solid #e2e8f0; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+<<<<<<< HEAD
             .header-layout { display: flex; justify-content: space-between; align-items: center; background-color: #F0F2FA; padding: 20px; border-radius: 8px; border-bottom: 2px solid #283B91; margin-bottom: 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             
             .company-logo-container { width: 80px !important; height: 40px !important; display: flex !important; align-items: center !important; justify-content: center !important; overflow: hidden !important; }
@@ -349,6 +382,12 @@ export default function RecursosHumanos({ currentUser, onRefreshData }: Recursos
             .company-details { font-size: 9.5px; color: #718096; }
             
             .doc-title-badge { background: #FFF0F6; color: #EA088C; padding: 6px 12px; border-radius: 6px; font-size: 14px; font-weight: bold; text-align: center; height: fit-content; text-transform: uppercase; border: 1px solid #FFD8E4; }
+=======
+            .header-layout { display: flex; justify-content: space-between; border-bottom: 2px solid #2B6CB0; padding-bottom: 20px; margin-bottom: 20px; }
+            .company-info { font-size: 13px; color: #4a5568; line-height: 1.4; }
+            .company-name { font-size: 22px; font-weight: 800; color: #2B6CB0; letter-spacing: -0.5px; margin-bottom: 4px; }
+            .doc-title-badge { background: #EBF8FF; color: #2B6CB0; padding: 6px 12px; border-radius: 6px; font-size: 14px; font-weight: bold; text-align: center; height: fit-content; text-transform: uppercase; border: 1px solid #BEE3F8; }
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
             
             .meta-grid { display: grid; grid-template-cols: 12fr; gap: 15px; margin-bottom: 25px; background: #f7fafc; padding: 15px; border-radius: 6px; border: 1px solid #edf2f7; }
             .meta-section { display: grid; grid-template-cols: 1fr 1fr; gap: 20px; font-size: 12.5px; }
@@ -357,27 +396,40 @@ export default function RecursosHumanos({ currentUser, onRefreshData }: Recursos
             .meta-value { color: #2d3748; font-weight: 600; }
             
             .table { width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 13px; }
+<<<<<<< HEAD
             .table th { background: #283B91; color: #ffffff; font-weight: 700; padding: 10px 12px; text-transform: uppercase; font-size: 11px; text-align: left; }
+=======
+            .table th { background: #2B6CB0; color: #ffffff; font-weight: 700; padding: 10px 12px; text-transform: uppercase; font-size: 11px; text-align: left; }
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
             .table td { border-bottom: 1px solid #e2e8f0; padding: 10px 12px; }
             .table tr:nth-child(even) td { background: #fcfdfd; }
             
             .totals-section { display: grid; grid-template-cols: 1fr 1fr; gap: 20px; margin-top: 15px; margin-bottom: 30px; font-size: 13px; border-top: 1px solid #e2e8f0; padding-top: 15px; }
             .totals-box { background: #f7fafc; padding: 12px; border-radius: 6px; border: 1px solid #edf2f7; }
             .totals-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-weight: 600; }
+<<<<<<< HEAD
             .totals-row.final { border-top: 2px solid #283B91; padding-top: 8px; margin-top: 8px; font-size: 15px; font-weight: 800; color: #283B91; }
+=======
+            .totals-row.final { border-top: 2px solid #2B6CB0; padding-top: 8px; margin-top: 8px; font-size: 15px; font-weight: 800; color: #2B6CB0; }
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
             
             .signatures-container { margin-top: 50px; display: flex; justify-content: space-between; gap: 50px; }
             .sig-box { flex: 1; text-align: center; font-size: 12px; }
             .sig-line { border-top: 1px solid #a0aec0; margin-bottom: 8px; margin-top: 45px; }
             .sig-title { font-weight: 700; color: #4a5568; }
             .sig-sub { color: #718096; font-size: 11px; margin-top: 2px; }
+<<<<<<< HEAD
  
+=======
+
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
             .footer-note { text-align: center; color: #a0aec0; font-size: 10px; margin-top: 40px; border-top: 1px dashed #e2e8f0; padding-top: 15px; }
           </style>
         </head>
         <body>
           <div class="receipt-container">
             <div class="header-layout">
+<<<<<<< HEAD
               <div style="display: flex; align-items: center; gap: 20px;">
                 ${PRINT_LOGO_SVG}
                 <div class="company-info">
@@ -389,6 +441,12 @@ export default function RecursosHumanos({ currentUser, onRefreshData }: Recursos
                     <div>📞 +258 871665500 &nbsp;&bull;&nbsp; Av. Romão Fernandes Farinha nr 1504, Maputo, Mozambique 1103</div>
                   </div>
                 </div>
+=======
+              <div class="company-info">
+                <div class="company-name">${companyName}</div>
+                <div>${companyLocation}</div>
+                <div>NUIT: ${companyNuit}</div>
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
               </div>
               <div class="doc-title-badge">Recibo de Salário</div>
             </div>
@@ -491,12 +549,20 @@ export default function RecursosHumanos({ currentUser, onRefreshData }: Recursos
               <div class="sig-box">
                 <div class="sig-line"></div>
                 <div class="sig-title">${companyName}</div>
+<<<<<<< HEAD
                 <div class="sig-sub">Assinatura da Administração</div>
+=======
+                <div class="sig-sub">Assinatura da Administração (Pagador)</div>
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
               </div>
               <div class="sig-box">
                 <div class="sig-line"></div>
                 <div class="sig-title">${r.funcionario_nome}</div>
+<<<<<<< HEAD
                 <div class="sig-sub">Assinatura do Funcionário</div>
+=======
+                <div class="sig-sub">Assinatura do Funcionário (Recebedor)</div>
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
               </div>
             </div>
 
@@ -548,6 +614,7 @@ export default function RecursosHumanos({ currentUser, onRefreshData }: Recursos
           <style>
             body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 30px; color: #2d3748; background: #fff; line-height: 1.5; }
             .receipt-container { max-width: 800px; margin: 0 auto; border: 1px solid #e2e8f0; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+<<<<<<< HEAD
             .header-layout { display: flex; justify-content: space-between; align-items: center; background-color: #F0F2FA; padding: 20px; border-radius: 8px; border-bottom: 2px solid #283B91; margin-bottom: 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             
             .company-logo-container { width: 80px !important; height: 40px !important; display: flex !important; align-items: center !important; justify-content: center !important; overflow: hidden !important; }
@@ -560,6 +627,12 @@ export default function RecursosHumanos({ currentUser, onRefreshData }: Recursos
             .company-details { font-size: 9.5px; color: #718096; }
             
             .doc-title-badge { background: #FFF0F6; color: #EA088C; padding: 6px 12px; border-radius: 6px; font-size: 14px; font-weight: bold; text-align: center; height: fit-content; text-transform: uppercase; border: 1px solid #FFD8E4; }
+=======
+            .header-layout { display: flex; justify-content: space-between; border-bottom: 2px solid #2B6CB0; padding-bottom: 20px; margin-bottom: 20px; }
+            .company-info { font-size: 13px; color: #4a5568; line-height: 1.4; }
+            .company-name { font-size: 22px; font-weight: 800; color: #2B6CB0; letter-spacing: -0.5px; margin-bottom: 4px; }
+            .doc-title-badge { background: #EBF8FF; color: #2B6CB0; padding: 6px 12px; border-radius: 6px; font-size: 14px; font-weight: bold; text-align: center; height: fit-content; text-transform: uppercase; border: 1px solid #BEE3F8; }
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
             
             .meta-grid { display: grid; grid-template-cols: 12fr; gap: 15px; margin-bottom: 25px; background: #f7fafc; padding: 15px; border-radius: 6px; border: 1px solid #edf2f7; }
             .meta-section { display: grid; grid-template-cols: 1fr 1fr; gap: 20px; font-size: 12.5px; }
@@ -568,27 +641,42 @@ export default function RecursosHumanos({ currentUser, onRefreshData }: Recursos
             .meta-value { color: #2d3748; font-weight: 600; }
             
             .table { width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 13px; }
+<<<<<<< HEAD
             .table th { background: #283B91; color: #ffffff; font-weight: 700; padding: 10px 12px; text-transform: uppercase; font-size: 11px; text-align: left; }
+=======
+            .table th { background: #2B6CB0; color: #ffffff; font-weight: 700; padding: 10px 12px; text-transform: uppercase; font-size: 11px; text-align: left; }
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
             .table td { border-bottom: 1px solid #e2e8f0; padding: 10px 12px; }
             .table tr:nth-child(even) td { background: #fcfdfd; }
             
             .totals-section { display: grid; grid-template-cols: 1fr 1fr; gap: 20px; margin-top: 15px; margin-bottom: 30px; font-size: 13px; border-top: 1px solid #e2e8f0; padding-top: 15px; }
             .totals-box { background: #f7fafc; padding: 12px; border-radius: 6px; border: 1px solid #edf2f7; }
             .totals-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-weight: 600; }
+<<<<<<< HEAD
             .totals-row.final { border-top: 2px solid #283B91; padding-top: 8px; margin-top: 8px; font-size: 15px; font-weight: 800; color: #283B91; }
+=======
+            .totals-row.final { border-top: 2px solid #2B6CB0; padding-top: 8px; margin-top: 8px; font-size: 15px; font-weight: 800; color: #2B6CB0; }
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
             
             .signatures-container { margin-top: 50px; display: flex; justify-content: space-between; gap: 50px; }
             .sig-box { flex: 1; text-align: center; font-size: 12px; }
             .sig-line { border-top: 1px solid #a0aec0; margin-bottom: 8px; margin-top: 45px; }
             .sig-title { font-weight: 700; color: #4a5568; }
             .sig-sub { color: #718096; font-size: 11px; margin-top: 2px; }
+<<<<<<< HEAD
  
+=======
+
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
             .footer-note { text-align: center; color: #a0aec0; font-size: 10px; margin-top: 40px; border-top: 1px dashed #e2e8f0; padding-top: 15px; }
             @media print {
               body { padding: 0; background: none; }
               .receipt-container { border: none; box-shadow: none; padding: 0; }
+<<<<<<< HEAD
               .header-layout { background-color: #F0F2FA !important; border-bottom: 2px solid #283B91 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
               .doc-title-badge { background-color: #FFF0F6 !important; border-color: #FFD8E4 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+=======
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
             }
           </style>
         </head>
@@ -598,6 +686,7 @@ export default function RecursosHumanos({ currentUser, onRefreshData }: Recursos
               <div style="display: flex; align-items: center; gap: 20px;">
                 ${PRINT_LOGO_SVG}
                 <div class="company-info">
+<<<<<<< HEAD
                   <div class="company-name">RHINO CARGO LDA</div>
                   <div class="company-slogan">Força | Flexibilidade | Movimento</div>
                   <div class="company-subtitle">Empresa Moçambicana</div>
@@ -605,6 +694,11 @@ export default function RecursosHumanos({ currentUser, onRefreshData }: Recursos
                     <div>🚛 Transportes de qualidade &nbsp;&bull;&nbsp; 📦 Entregas para todas províncias</div>
                     <div>📞 +258 871665500 &nbsp;&bull;&nbsp; Av. Romão Fernandes Farinha nr 1504, Maputo, Mozambique 1103</div>
                   </div>
+=======
+                  <div class="company-name">${companyName}</div>
+                  <div><strong>NUIT:</strong> ${companyNuit}</div>
+                  <div><strong>Localização:</strong> ${companyLocation}</div>
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
                 </div>
               </div>
               <div class="doc-title-badge">
@@ -727,12 +821,20 @@ export default function RecursosHumanos({ currentUser, onRefreshData }: Recursos
               <div class="sig-box">
                 <div class="sig-line"></div>
                 <div class="sig-title">${companyName}</div>
+<<<<<<< HEAD
                 <div class="sig-sub">Assinatura da Administração</div>
+=======
+                <div class="sig-sub">Assinatura da Administração (Pagador)</div>
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
               </div>
               <div class="sig-box">
                 <div class="sig-line"></div>
                 <div class="sig-title">${r.funcionario_nome}</div>
+<<<<<<< HEAD
                 <div class="sig-sub">Assinatura do Funcionário</div>
+=======
+                <div class="sig-sub">Assinatura do Funcionário (Recebedor)</div>
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
               </div>
             </div>
 
@@ -1245,6 +1347,7 @@ export default function RecursosHumanos({ currentUser, onRefreshData }: Recursos
                 </button>
               </div>
 
+<<<<<<< HEAD
               <form onSubmit={handleCreatePayslip} className="flex flex-col max-h-[82vh]">
                 <div className="p-6 overflow-y-auto space-y-4 max-h-[60vh] scrollbar-thin scrollbar-thumb-slate-800">
                   {/* Employee select */}
@@ -1429,6 +1532,190 @@ export default function RecursosHumanos({ currentUser, onRefreshData }: Recursos
 
                 {/* Submit actions */}
                 <div className="p-4 bg-slate-950 border-t border-rhino-border/60 flex items-center justify-end gap-2 shrink-0">
+=======
+              <form onSubmit={handleCreatePayslip} className="p-6 space-y-4">
+                {/* Employee select */}
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Colaborador Destinatário *</label>
+                  <select
+                    required
+                    value={payForm.funcionario_id}
+                    onChange={(e) => handlePayFuncionarioChange(e.target.value)}
+                    className="w-full bg-slate-950 border border-rhino-border rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-rhino-pink"
+                  >
+                    <option value="">-- Seleccionar Funcionário --</option>
+                    {funcionarios.map(f => (
+                      <option key={f.id} value={f.id}>{f.nome} ({f.cargo})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Mes/Ano */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Mês / Ano Ref *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="MM/YYYY"
+                      value={payForm.mes_ano}
+                      onChange={(e) => setPayForm(p => ({ ...p, mes_ano: e.target.value }))}
+                      className="w-full bg-slate-950 border border-rhino-border rounded-lg px-3 py-2 text-xs text-white focus:outline-none font-mono"
+                    />
+                  </div>
+
+                  {/* Estado */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Estado de Pagamento</label>
+                    <select
+                      value={payForm.estado}
+                      onChange={(e) => setPayForm(p => ({ ...p, estado: e.target.value }))}
+                      className="w-full bg-slate-950 border border-rhino-border rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-rhino-pink"
+                    >
+                      <option value="Pago">Pago</option>
+                      <option value="Pendente">Pendente</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* RENDIMENTOS E DEDUÇÕES */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Left Column: Rendimentos (Credits) */}
+                  <div className="space-y-3 p-3 bg-slate-950/40 rounded-lg border border-rhino-border/40">
+                    <h4 className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider border-b border-rhino-border/20 pb-1.5 flex items-center justify-between">
+                      <span>Rendimentos (+)</span>
+                    </h4>
+                    
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Salário Base (MZN) *</label>
+                      <input
+                        type="number"
+                        required
+                        value={payForm.salario_base}
+                        onChange={(e) => setPayForm(p => ({ ...p, salario_base: e.target.value }))}
+                        className="w-full bg-slate-950 border border-rhino-border rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Subsídios (MZN)</label>
+                      <input
+                        type="number"
+                        value={payForm.subsidios}
+                        onChange={(e) => setPayForm(p => ({ ...p, subsidios: e.target.value }))}
+                        className="w-full bg-slate-950 border border-rhino-border rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Horas Extras (MZN)</label>
+                      <input
+                        type="number"
+                        value={payForm.horas_extras}
+                        onChange={(e) => setPayForm(p => ({ ...p, horas_extras: e.target.value }))}
+                        className="w-full bg-slate-950 border border-rhino-border rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Outros Bónus / Rotas</label>
+                      <input
+                        type="number"
+                        value={payForm.bonus}
+                        onChange={(e) => setPayForm(p => ({ ...p, bonus: e.target.value }))}
+                        className="w-full bg-slate-950 border border-rhino-border rounded-lg px-2.5 py-1.5 text-xs text-emerald-400 focus:outline-none font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Right Column: Deduções (Debits) */}
+                  <div className="space-y-3 p-3 bg-slate-950/40 rounded-lg border border-rhino-border/40">
+                    <h4 className="text-[10px] font-bold text-rose-400 uppercase tracking-wider border-b border-rhino-border/20 pb-1.5">
+                      <span>Deduções (-)</span>
+                    </h4>
+                    
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Faltas (MZN)</label>
+                      <input
+                        type="number"
+                        value={payForm.faltas}
+                        onChange={(e) => setPayForm(p => ({ ...p, faltas: e.target.value }))}
+                        className="w-full bg-slate-950 border border-rhino-border rounded-lg px-2.5 py-1.5 text-xs text-rose-400 focus:outline-none font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider">INSS Trabalhador (3%) (MZN)</label>
+                      <input
+                        type="number"
+                        value={payForm.inss}
+                        onChange={(e) => setPayForm(p => ({ ...p, inss: e.target.value }))}
+                        className="w-full bg-slate-950 border border-rhino-border rounded-lg px-2.5 py-1.5 text-xs text-rose-400 focus:outline-none font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Retenção IRPS (MZN)</label>
+                      <input
+                        type="number"
+                        value={payForm.irps}
+                        onChange={(e) => setPayForm(p => ({ ...p, irps: e.target.value }))}
+                        className="w-full bg-slate-950 border border-rhino-border rounded-lg px-2.5 py-1.5 text-xs text-rose-400 focus:outline-none font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Outros Descontos</label>
+                      <input
+                        type="number"
+                        value={payForm.descontos}
+                        onChange={(e) => setPayForm(p => ({ ...p, descontos: e.target.value }))}
+                        className="w-full bg-slate-950 border border-rhino-border rounded-lg px-2.5 py-1.5 text-xs text-rose-400 focus:outline-none font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Net total estimation live */}
+                {(() => {
+                  const gross = Number(payForm.salario_base || 0) + Number(payForm.subsidios || 0) + Number(payForm.horas_extras || 0) + Number(payForm.bonus || 0);
+                  const deductions = Number(payForm.faltas || 0) + Number(payForm.inss || 0) + Number(payForm.irps || 0) + Number(payForm.descontos || 0);
+                  const net = gross - deductions;
+                  return (
+                    <div className="p-3.5 bg-slate-950 rounded-lg border border-rhino-border/80 text-[11px] font-mono space-y-1">
+                      <div className="flex justify-between text-slate-400">
+                        <span>Total de Rendimentos (Bruto):</span>
+                        <span className="text-emerald-400">{gross.toLocaleString("pt-MZ")} MZN</span>
+                      </div>
+                      <div className="flex justify-between text-slate-400">
+                        <span>Total de Descontos / Deduções:</span>
+                        <span className="text-rose-400">-{deductions.toLocaleString("pt-MZ")} MZN</span>
+                      </div>
+                      <div className="border-t border-slate-800/80 pt-1.5 flex justify-between font-bold text-white text-[12px]">
+                        <span>Salário Líquido Estimado:</span>
+                        <span className="text-rhino-pink">
+                          {net.toLocaleString("pt-MZ")} MZN
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Observações */}
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Anotações do Recibo</label>
+                  <textarea
+                    rows={2}
+                    placeholder="Ex: Inclui prémio de segurança rodoviária e descontos de adiantamento..."
+                    value={payForm.observacoes}
+                    onChange={(e) => setPayForm(p => ({ ...p, observacoes: e.target.value }))}
+                    className="w-full bg-slate-950 border border-rhino-border rounded-lg p-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-rhino-pink"
+                  />
+                </div>
+
+                {/* Submit actions */}
+                <div className="flex items-center justify-end gap-2 pt-4 border-t border-rhino-border/60">
+>>>>>>> 4e5fdc02b24fb0bdfc01f58ecafc0618baa4a82f
                   <button
                     type="button"
                     onClick={() => { setIsPayModalOpen(false); setEditingPayslipId(null); }}
