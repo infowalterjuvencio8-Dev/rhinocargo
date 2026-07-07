@@ -1,0 +1,6 @@
+{
+  "name": "Gestão de Frotas - Rhino Cargo",
+  "description": "Sistema completo de gestão de frotas para a Rhino Cargo LDA, focando em rastreamento, controle de combustível por província em Moçambique, controle de viagens e relatórios de desempenho.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
